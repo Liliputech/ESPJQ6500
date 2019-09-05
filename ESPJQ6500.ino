@@ -33,10 +33,10 @@
 CRGB leds[NUM_LEDS];// Define the array of leds
 static uint8_t hue = 0;//hue variable
 /*
-JQ6500_Serial mp3(3, 2); //les deux GPIO sont utilisés par la lib. SoftwareSerial comme ports série virtuels
-unsigned int audiofile; // numéro du fichier audio à lire
-unsigned int numFiles; // Total number of files on media (autodetected in setup())
-byte mediaType;        // Media type (autodetected in setup())                                                
+  JQ6500_Serial mp3(3, 2); //les deux GPIO sont utilisés par la lib. SoftwareSerial comme ports série virtuels
+  unsigned int audiofile; // numéro du fichier audio à lire
+  unsigned int numFiles; // Total number of files on media (autodetected in setup())
+  byte mediaType;        // Media type (autodetected in setup())
 */
 
 char ssid[] = "";
@@ -45,7 +45,7 @@ IPAddress mon_broker(192, 168, 0, 16);
 
 WiFiClient ESP01client;
 PubSubClient client(ESP01client);
-
+String payloadFromMQTT = "";
 
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
@@ -73,17 +73,17 @@ String topicName = clientID + "/#";//Topic individuel nominatif pour publier un 
 */
 
 /*
-//Concaténer 1? https://www.baldengineer.com/multiple-mqtt-topics-pubsubclient.html
-//String stringTwo;
-//stringTwo.concat((char)payload[i]);
+  //Concaténer 1? https://www.baldengineer.com/multiple-mqtt-topics-pubsubclient.html
+  //String stringTwo;
+  //stringTwo.concat((char)payload[i]);
 
-//Concaténer 2 ?: https://www.arduino.cc/en/Tutorial/StringAdditionOperator
-//char * defNameSharp = (char*)clientID.c_str() + '/' + '#';// on ajout /# à ESP_XXXXX donc ça fait ESP_XXXX/#
+  //Concaténer 2 ?: https://www.arduino.cc/en/Tutorial/StringAdditionOperator
+  //char * defNameSharp = (char*)clientID.c_str() + '/' + '#';// on ajout /# à ESP_XXXXX donc ça fait ESP_XXXX/#
 
-//https://github.com/knolleary/pubsubclient/issues/105
-//////////////////////////////////////////////////////////////////////////////////////////////
+  //https://github.com/knolleary/pubsubclient/issues/105
+  //////////////////////////////////////////////////////////////////////////////////////////////
 
-//OTA: https://arduino-esp8266.readthedocs.io/en/latest/ota_updates/readme.html
+  //OTA: https://arduino-esp8266.readthedocs.io/en/latest/ota_updates/readme.html
 
 */
 
@@ -246,30 +246,30 @@ void p3()
 {
   // First slide the led in one direction
   static int i = 0;
-    // Set the i'th led to White
-    leds[i] = CRGB::Red;
-    // Show the leds
-    FastLED.show();
-    // now that we've shown the leds, reset the i'th led to black
-    leds[i] = CRGB::Black;
-    // Wait a little bit before we loop around and do it again
-    delay(5);
-  i = (i+1)%NUM_LEDS;
+  // Set the i'th led to White
+  leds[i] = CRGB::Red;
+  // Show the leds
+  FastLED.show();
+  // now that we've shown the leds, reset the i'th led to black
+  leds[i] = CRGB::Black;
+  // Wait a little bit before we loop around and do it again
+  delay(5);
+  i = (i + 1) % NUM_LEDS;
 }
 
 //---------Path-drik.ino : allumage non maintenu en arrière--------
 void p4()
 {
   static int i = 0 ;
-    // Set the i'th led to White
-    leds[i] = CRGB::Blue;
-    // Show the leds
-    FastLED.show();
-    // now that we've shown the leds, reset the i'th led to black
-    leds[i] = CRGB::Black;
-    // Wait a little bit before we loop around and do it again
-    delay(5);
-  i=(i+1)%NUM_LEDS;
+  // Set the i'th led to White
+  leds[i] = CRGB::Blue;
+  // Show the leds
+  FastLED.show();
+  // now that we've shown the leds, reset the i'th led to black
+  leds[i] = CRGB::Black;
+  // Wait a little bit before we loop around and do it again
+  delay(5);
+  i = (i + 1) % NUM_LEDS;
 }
 
 //--------- DemoReel100: juggle--------
@@ -350,20 +350,20 @@ void p10()
   delay(20);
 }
 
-  //TEST ROUGE
-void p11(){
+//TEST ROUGE
+void p11() {
   //audiofile = 1;
- for (int i = 0; i < NUM_LEDS; i++) {
+  for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB::White;
     FastLED.show();
     leds[i] = CRGB::Black;
     delay(5);
   }
 }
-  //TEST BLEU
-void p12(){
+//TEST BLEU
+void p12() {
   //audiofile = 2;
- for (int i = 0; i < NUM_LEDS; i++) {
+  for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB::White;
     FastLED.show();
     leds[i] = CRGB::Black;
@@ -371,10 +371,10 @@ void p12(){
   }
 }
 
-  //TEST VERT
-  void p13(){
- //audiofile = 3;
- for (int i = 0; i < NUM_LEDS; i++) {
+//TEST VERT
+void p13() {
+  //audiofile = 3;
+  for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB::White;
     FastLED.show();
     leds[i] = CRGB::Black;
@@ -384,9 +384,6 @@ void p12(){
 /////////////////////////////////////////////////////////
 
 
-
-
-  
 //-------------FONCTION CALLBACK------------
 //l'étoile * means a pointer to the given type. Explained in chapter 1 of any C book
 //https://stackoverflow.com/questions/55637077/looking-for-explanation-about-simple-function-declaration
@@ -403,11 +400,11 @@ void callback(char* topic, byte* payload, unsigned int length)
   //https://www.baldengineer.com/multiple-mqtt-topics-pubsubclient.html
   //référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
   if (strcmp(topic, "holdstate") == 0) {//si le contenu de topic est holdstate alors retourne 0
-    
+
     //----On récupère le message-----
     /*
       MQTT transmets tout en ASCII donc pour obtenir un digit :
-     
+
       1) on récupère chaque caractère : on itère dans cellules du tableau payload
       afin recueillir les caractères transmis et les placer dans un byte.
       Donc si MQTT : [2][5][5] vers ESP01 : 255 (255 maximum car byte)
@@ -417,11 +414,14 @@ void callback(char* topic, byte* payload, unsigned int length)
       explications: si depuis le Broker j'envoie hold = 5 et ledPattern 3 (par ex.) alors j'obtiens dans le moniteur Arduino 53 fois le ledPattern 3
       étant donné que ascii '5' vaut 53 donc je comprends que depuis le Broker j'envoies en ASCII et pas en nombre
     */
+
     for (int i = 0; i < length; i++) {
-      hold = (byte)payload[i] - 48; //
-      Serial.print(hold);
+      if (isDigit(payload[i]))
+        payloadFromMQTT += (char)payload[i];
     }
-    Serial.println();
+    hold = payloadFromMQTT.toInt();
+    payloadFromMQTT = "";
+    Serial.print(hold);
   }
 
 
@@ -429,23 +429,26 @@ void callback(char* topic, byte* payload, unsigned int length)
   //------Si le topic est ledstate (simile)-----
   else if  (strcmp(topic, "ledstate") == 0) {
     for (int i = 0; i < length; i++) {
-      ledPattern = (byte)payload[0] - 48;
-      Serial.print(ledPattern);
-      
-      if (ledPattern == 3 || ledPattern == 4 || ledPattern == 11 || ledPattern == 12 || ledPattern == 13) {//si les fonctions 3 ou 4 sont appelées
-        blocLoop = true;//orienter le processeur vers le nb de boucles à effectuer
-      }
-      //      else {
-      //        hold = 0;//BOUCLAGE PERPETUEL
-      //        client.publish("holdstate", "0"); //(-t , -m) càd publier l'état de la variable hold sur le topic "holdstate", pour une màj de l'interface graphique Paho-JS
+      if (isDigit(payload[i]))
+        payloadFromMQTT += (char)payload[i];
     }
+    ledPattern = payloadFromMQTT.toInt();
+    payloadFromMQTT = "";
+    Serial.print(ledPattern);
+
+    if (ledPattern == 3 || ledPattern == 4 || ledPattern == 11 || ledPattern == 12 || ledPattern == 13) {//si les fonctions 3 ou 4 sont appelées
+      blocLoop = true;//orienter le processeur vers le nb de boucles à effectuer
+    }
+    //      else {
+    //        hold = 0;//BOUCLAGE PERPETUEL
+    //        client.publish("holdstate", "0"); //(-t , -m) càd publier l'état de la variable hold sur le topic "holdstate", pour une màj de l'interface graphique Paho-JS
     Serial.println();
   }
 
 
 
- 
-  //Si le topic est clientID/ledstate - 
+
+  //Si le topic est clientID/ledstate -
   //exemple : mosquitto_pub -t ESP_2ABD4E/ledstate -m 3
   else  if (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) {
     for (int i = 0; i < length; i++) {
@@ -458,38 +461,38 @@ void callback(char* topic, byte* payload, unsigned int length)
       //        hold = 0;//BOUCLAGE PERPETUEL
       //        client.publish("holdstate", "0"); //(-t , -m) càd publier l'état de la variable hold sur le topic "holdstate", pour une màj de l'interface graphique Paho-JS
     }
-    Serial.println(); 
+    Serial.println();
   }
 
 
-  
+
   //Si le topic est clientID/holdstate - simile
-else if (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) {
-   for (int i = 0; i < length; i++) {
+  else if (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) {
+    for (int i = 0; i < length; i++) {
       hold = (byte)payload[i] - 48; //
       Serial.print(hold);
     }
     Serial.println();
   }
 
-/*
- * https://github.com/knolleary/pubsubclient/issues/334
- * The publish functions expect char[] types to be passed in rather than Strings.
- * You need to use the String.toCharArray() function to convert your strings to the necessary type.
- * Si le topic est "welcome"
-*/
-/*
-else if (strcmp(topic, "welcome") == 0) {
-  
-  //toCharArray() -> https://www.arduino.cc/reference/en/language/variables/data-types/string/functions/tochararray/
-  int[] welcomeTOchar = welcome.toCharArray();
-  
-  client.publish(welcomeTOchar[], clientID); 
-      Serial.print(clientID);
+  /*
+     https://github.com/knolleary/pubsubclient/issues/334
+     The publish functions expect char[] types to be passed in rather than Strings.
+     You need to use the String.toCharArray() function to convert your strings to the necessary type.
+     Si le topic est "welcome"
+  */
+  /*
+    else if (strcmp(topic, "welcome") == 0) {
+
+    //toCharArray() -> https://www.arduino.cc/reference/en/language/variables/data-types/string/functions/tochararray/
+    int[] welcomeTOchar = welcome.toCharArray();
+
+    client.publish(welcomeTOchar[], clientID);
+        Serial.print(clientID);
+      }
+      Serial.println();
     }
-    Serial.println();
-  }
-*/
+  */
 
 }
 
@@ -538,32 +541,32 @@ void setup() {
   delay(10);
 
   //////////// ESP01 settings //////////
-//********************* CHANGE ESP01 PIN FUNCTION **************************************
+  //********************* CHANGE ESP01 PIN FUNCTION **************************************
   pinMode(3, FUNCTION_3); //(RX) pin (nommé également pin3 dans la doc) devient GPIO 3
-//**************************************************************************************
+  //**************************************************************************************
 
-//////////// ATTENTION ////////////////////////////////////////////////   
+  //////////// ATTENTION ////////////////////////////////////////////////
   //surtout pas configurer le GPIO3 en OUTPUT !!
   //pinMode(3, OUTPUT);
   //SoftwareSerial.h en fait un port série virtuel, pas une sortie data classique !!
-///////////////////////////////////////////////////////////////////////     
+  ///////////////////////////////////////////////////////////////////////
 
 
-//////////////////// JQ6500 settings ////////////////////
-/*
-//----------------Initialisation module audio--------------
-  mp3.begin(9600);
-  mp3.reset();
-  mp3.setVolume(40);
-  mp3.setLoopMode(MP3_LOOP_NONE);
-  mp3.setEqualizer(MP3_EQ_NORMAL);
+  //////////////////// JQ6500 settings ////////////////////
+  /*
+    //----------------Initialisation module audio--------------
+    mp3.begin(9600);
+    mp3.reset();
+    mp3.setVolume(40);
+    mp3.setLoopMode(MP3_LOOP_NONE);
+    mp3.setEqualizer(MP3_EQ_NORMAL);
 
-// we select the built in source NOT SD card source
-  mp3.setSource(MP3_SRC_BUILTIN);
-  numFiles = mp3.countFiles(MP3_SRC_BUILTIN);
-  mediaType = MP3_SRC_BUILTIN;
-//////////////////////////////////////
-*/
+    // we select the built in source NOT SD card source
+    mp3.setSource(MP3_SRC_BUILTIN);
+    numFiles = mp3.countFiles(MP3_SRC_BUILTIN);
+    mediaType = MP3_SRC_BUILTIN;
+    //////////////////////////////////////
+  */
 
   setup_wifi();
 
@@ -588,15 +591,15 @@ void setup() {
 
 
 void loop() {
-/*
-//----------------- JQ6500 ------------------//
-  if (mp3.getStatus() != MP3_STATUS_PLAYING)
-  {
-    mp3.playFileByIndexNumber(audiofile);
-    mp3.play();
-  }
-*/
-  
+  /*
+    //----------------- JQ6500 ------------------//
+    if (mp3.getStatus() != MP3_STATUS_PLAYING)
+    {
+      mp3.playFileByIndexNumber(audiofile);
+      mp3.play();
+    }
+  */
+
   //do some periodic updates
   EVERY_N_MILLISECONDS( 20 ) {
     gHue++;  // slowly cycle the "base color" through the rainbow
