@@ -322,7 +322,7 @@ void p2()
 void p3()
 {
   // First slide the led in one direction
-  for (int i = 0; i < NUM_LEDS; i++) {
+  static int i = 0;
     // Set the i'th led to White
     leds[i] = CRGB::Red;
     // Show the leds
@@ -331,7 +331,7 @@ void p3()
     leds[i] = CRGB::Black;
     // Wait a little bit before we loop around and do it again
     delay(5);
-  }
+  i = (i+1)%NUM_LEDS;
 }
 
 //---------Path-drik.ino : allumage non maintenu en arrière--------
