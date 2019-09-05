@@ -337,7 +337,7 @@ void p3()
 //---------Path-drik.ino : allumage non maintenu en arrière--------
 void p4()
 {
-  for (int i = NUM_LEDS - 1; i >= 0; i--) {
+  static int i = 0 ;
     // Set the i'th led to White
     leds[i] = CRGB::Blue;
     // Show the leds
@@ -346,7 +346,7 @@ void p4()
     leds[i] = CRGB::Black;
     // Wait a little bit before we loop around and do it again
     delay(5);
-  }
+  i=(i+1)%NUM_LEDS;
 }
 
 //--------- DemoReel100: juggle--------
