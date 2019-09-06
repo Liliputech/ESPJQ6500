@@ -5,7 +5,7 @@
 //AUDIO LIBS
 #include <Arduino.h>
 #include <SoftwareSerial.h>
-//#include <JQ6500_Serial.h>
+#include <JQ6500_Serial.h>
 
 
 //MQTT LIBS
@@ -33,12 +33,13 @@
 
 CRGB leds[NUM_LEDS];// Define the array of leds
 static uint8_t hue = 0;//hue variable
+
+JQ6500_Serial mp3(3, 2); //les deux GPIO sont utilisés par la lib. SoftwareSerial comme ports série virtuels
 /*
-  JQ6500_Serial mp3(3, 2); //les deux GPIO sont utilisés par la lib. SoftwareSerial comme ports série virtuels
-  unsigned int audiofile; // numéro du fichier audio à lire
-  unsigned int numFiles; // Total number of files on media (autodetected in setup())
-  byte mediaType;        // Media type (autodetected in setup())
-*/
+unsigned int audiofile; // numéro du fichier audio à lire
+unsigned int numFiles; // Total number of files on media (autodetected in setup())
+byte mediaType;        // Media type (autodetected in setup())
+//*/
 
 char ssid[] = "";
 char password[] = "";
@@ -197,9 +198,9 @@ void addGlitter( fract8 chanceOfGlitter)
 //-------FADE OUT--------
 void p0() {
   static int i = 0;
-    fadeToBlackBy(leds, NUM_LEDS, 0);//https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
-    delay(5);
-    i = (i+1) % NUM_LEDS;
+  fadeToBlackBy(leds, NUM_LEDS, 0);//https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
+  delay(5);
+  i = (i + 1) % NUM_LEDS;
 }
 
 
@@ -209,32 +210,20 @@ void p0() {
 void p1()
 {
   static int i = 0;
-    // Set the i'th led to red
-    leds[i] = CHSV(hue++, 255, 255);
-    // Show the leds
-    
-    // now that we've shown the leds, reset the i'th led to black
-    // leds[i] = CRGB::Black;
-    //fadeall();
-    // Wait a little bit before we loop around and do it again
-    delay(30);
-  i = (i+1) % NUM_LEDS;
+  // Set the i'th led to red
+  leds[i] = CHSV(hue++, 255, 255);
+  delay(30);
+  i = (i + 1) % NUM_LEDS;
 }
 
 //---------allumage successif maintenu en arrière--------
 void p2()
 {
   static int i = 0;
-    // Set the i'th led to red
-    leds[i] = CHSV(hue++, 255, 255);
-    // Show the leds
-    
-    // now that we've shown the leds, reset the i'th led to black
-    // leds[i] = CRGB::Black;
-    //fadeall();
-    // Wait a little bit before we loop around and do it again
-    delay(30);
-  i = (i+1) % NUM_LEDS;
+  // Set the i'th led to red
+  leds[i] = CHSV(hue++, 255, 255);
+  delay(30);
+  i = (i + 1) % NUM_LEDS;
 }
 
 //---------Path-drik.ino : allumage successif non maintenu en avant--------
@@ -243,13 +232,8 @@ void p3()
 {
   // First slide the led in one direction
   static int i = 0;
-  // Set the i'th led to White
+  if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  // Show the leds
-  
-  // now that we've shown the leds, reset the i'th led to black
-  leds[i] = CRGB::Black;
-  // Wait a little bit before we loop around and do it again
   delay(5);
   i = (i + 1) % NUM_LEDS;
 }
@@ -258,13 +242,8 @@ void p3()
 void p4()
 {
   static int i = 0 ;
-  // Set the i'th led to White
+  if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Blue;
-  // Show the leds
-  
-  // now that we've shown the leds, reset the i'th led to black
-  leds[i] = CRGB::Black;
-  // Wait a little bit before we loop around and do it again
   delay(5);
   i = (i + 1) % NUM_LEDS;
 }
@@ -279,7 +258,7 @@ void p5() {
     dothue += 32;
 
     // send the 'leds' array out to the actual LED strip
-    
+
     delay(20);
   }
 }
@@ -294,7 +273,7 @@ void p6() {
     leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
 
     // send the 'leds' array out to the actual LED strip
-    
+
     delay(20);
   }
 }
@@ -307,7 +286,7 @@ void p7()
   leds[pos] += CHSV( gHue, 255, 192);
 
   // send the 'leds' array out to the actual LED strip
-  
+
   delay(20);
 }
 
@@ -320,7 +299,7 @@ void p8()
   leds[pos] += CHSV( gHue + random8(64), 200, 255);
 
   // send the 'leds' array out to the actual LED strip
-  
+
   delay(20);
 }
 
@@ -331,7 +310,7 @@ void p9()
   fill_rainbow( leds, NUM_LEDS, gHue, 7);
 
   // send the 'leds' array out to the actual LED strip
-  
+
   delay(20);
 }
 
@@ -343,41 +322,40 @@ void p10()
   addGlitter(80);
 
   // send the 'leds' array out to the actual LED strip
-  
+
   delay(20);
 }
 
+
 //TEST ROUGE
 void p11() {
-  //audiofile = 1;
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB::White;
-    
-    leds[i] = CRGB::Black;
-    delay(5);
-  }
+   // First slide the led in one direction
+  static int i = 0;
+  if ( i > 0) leds[i - 1] = CRGB::Black;
+  leds[i] = CRGB::Red;
+  delay(5);
+  i = (i + 1) % NUM_LEDS;
 }
 //TEST BLEU
 void p12() {
-  //audiofile = 2;
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB::White;
-    
-    leds[i] = CRGB::Black;
-    delay(5);
-  }
+ // First slide the led in one direction
+  static int i = 0;
+  if ( i > 0) leds[i - 1] = CRGB::Black;
+  leds[i] = CRGB::Red;
+  delay(5);
+  i = (i + 1) % NUM_LEDS;
 }
 
 //TEST VERT
 void p13() {
-  //audiofile = 3;
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB::White;
-    
-    leds[i] = CRGB::Black;
-    delay(5);
-  }
+   // First slide the led in one direction
+  static int i = 0;
+  if ( i > 0) leds[i - 1] = CRGB::Black;
+  leds[i] = CRGB::Red;
+  delay(5);
+  i = (i + 1) % NUM_LEDS;
 }
+
 /////////////////////////////////////////////////////////
 
 
@@ -393,21 +371,21 @@ void callback(char* topic, byte* payload, unsigned int length)
   Serial.print("] ");
 
 
-//On identifie le topic que l'on veut traiter grâce à strcmp() pour "String Compare" : strcmp retourne un 0 si les deux string sont équivalentes
-//référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
+  //On identifie le topic que l'on veut traiter grâce à strcmp() pour "String Compare" : strcmp retourne un 0 si les deux string sont équivalentes
+  //référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
 
-  
-  //-----durée en secondes pour tous les clients, exemple 10 secondes : mosquitto_pub -t holdstate -m 10 
+
+  //-----durée en secondes pour tous les clients, exemple 10 secondes : mosquitto_pub -t holdstate -m 10
   if (strcmp(topic, "holdstate") == 0) {//si le contenu de topic est holdstate alors retourne 0
     for (int i = 0; i < length; i++) { //itérer dans toute la longueur message, length est fourni dans le callback MQTT
-      if (isDigit(payload[i]))// tester si le payload est bien un chiffre décimal 
+      if (isDigit(payload[i]))// tester si le payload est bien un chiffre décimal
         payloadFromMQTT += (char)payload[i];//caster en type char
     }
-    holdPattern = payloadFromMQTT.toInt();//transformer la String en entier et stocker dans la variable 
+    holdPattern = payloadFromMQTT.toInt();//transformer la String en entier et stocker dans la variable
     payloadFromMQTT = "";//reset : vider la String pour le prochain payload
     Serial.print(holdPattern);
   }
-  
+
 
   //------appel d'un ledAudioPattern de lumière+sons pour tous les clients -----
   else if  (strcmp(topic, "ledstate") == 0) {
@@ -424,59 +402,59 @@ void callback(char* topic, byte* payload, unsigned int length)
   //-----ledAudioPattern qui s'adresse à un unique clientID, exemple : mosquitto_pub -t ESP_2ABD4E/ledstate -m 3
   else  if (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) {
     for (int i = 0; i < length; i++) {
-        if (isDigit(payload[i]))
+      if (isDigit(payload[i]))
         payloadFromMQTT += (char)payload[i];
     }
-      ledAudioPattern = payloadFromMQTT.toInt();
+    ledAudioPattern = payloadFromMQTT.toInt();
     payloadFromMQTT = "";
     Serial.print(ledAudioPattern);
-    }
-
-
-//----- durée en secondes qui s'adresse à un unique clientID, exemple : mosquitto_pub -t ESP_2ABD4E/holdstate -m 10
-  else  if (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) {
-    for (int i = 0; i < length; i++) {
-        if (isDigit(payload[i]))
-        payloadFromMQTT += (char)payload[i];
-    }
-      holdPattern = payloadFromMQTT.toInt();
-    payloadFromMQTT = "";
-    Serial.print(holdPattern);
-    }
-
-//-----Si le topic est modestate : 
-//0 = enchainement de tout le tableau gPatterns en restant sur chaque pattern holdPattern secondes et 1 = jouer uniquement le pattern ledAudioPattern
-  else  if (strcmp(topic, "modestate") == 0) {
-    for (int i = 0; i < length; i++) {
-        if (isDigit(payload[i]))
-        payloadFromMQTT += (char)payload[i];
-    }
-      modePattern = payloadFromMQTT.toInt();
-    payloadFromMQTT = "";
-    Serial.print(ledAudioPattern);
-    }
-    
-    Serial.println();
   }
 
-  /*
-     https://github.com/knolleary/pubsubclient/issues/334
-     The publish functions expect char[] types to be passed in rather than Strings.
-     You need to use the String.toCharArray() function to convert your strings to the necessary type.
-     Si le topic est "welcome"
-  */
-  /*
-    else if (strcmp(topic, "welcome") == 0) {
 
-    //toCharArray() -> https://www.arduino.cc/reference/en/language/variables/data-types/string/functions/tochararray/
-    int[] welcomeTOchar = welcome.toCharArray();
-
-    client.publish(welcomeTOchar[], clientID);
-        Serial.print(clientID);
-      }
-      Serial.println();
+  //----- durée en secondes qui s'adresse à un unique clientID, exemple : mosquitto_pub -t ESP_2ABD4E/holdstate -m 10
+  else  if (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) {
+    for (int i = 0; i < length; i++) {
+      if (isDigit(payload[i]))
+        payloadFromMQTT += (char)payload[i];
     }
-  */
+    holdPattern = payloadFromMQTT.toInt();
+    payloadFromMQTT = "";
+    Serial.print(holdPattern);
+  }
+
+  //-----Si le topic est modestate :
+  //0 = enchainement de tout le tableau gPatterns en restant sur chaque pattern holdPattern secondes et 1 = jouer uniquement le pattern ledAudioPattern
+  else  if (strcmp(topic, "modestate") == 0) {
+    for (int i = 0; i < length; i++) {
+      if (isDigit(payload[i]))
+        payloadFromMQTT += (char)payload[i];
+    }
+    modePattern = payloadFromMQTT.toInt();
+    payloadFromMQTT = "";
+    Serial.print(ledAudioPattern);
+  }
+
+  Serial.println();
+}
+
+/*
+   https://github.com/knolleary/pubsubclient/issues/334
+   The publish functions expect char[] types to be passed in rather than Strings.
+   You need to use the String.toCharArray() function to convert your strings to the necessary type.
+   Si le topic est "welcome"
+*/
+/*
+  else if (strcmp(topic, "welcome") == 0) {
+
+  //toCharArray() -> https://www.arduino.cc/reference/en/language/variables/data-types/string/functions/tochararray/
+  int[] welcomeTOchar = welcome.toCharArray();
+
+  client.publish(welcomeTOchar[], clientID);
+      Serial.print(clientID);
+    }
+    Serial.println();
+  }
+*/
 
 /*IDEM
   void (*func_ptr[])() = {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9};
@@ -518,7 +496,7 @@ SimplePatternList gPatterns = { p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p1
 void setPattern() {
   if ((ledAudioPattern >= 0) && (ledAudioPattern < nFunc))
   {
-    gCurrentPatternNumber= ledAudioPattern; //-1 car sinon, en envoyant un message MQTT 1, il me joue l'index func[1] soit la fonction p2() et non la fonction p1()
+    gCurrentPatternNumber = ledAudioPattern; //-1 car sinon, en envoyant un message MQTT 1, il me joue l'index func[1] soit la fonction p2() et non la fonction p1()
   }
 }
 
@@ -539,7 +517,7 @@ void setup() {
 
 
   //////////////////// JQ6500 settings ////////////////////
-  /*
+
     //----------------Initialisation module audio--------------
     mp3.begin(9600);
     mp3.reset();
@@ -549,10 +527,10 @@ void setup() {
 
     // we select the built in source NOT SD card source
     mp3.setSource(MP3_SRC_BUILTIN);
-    numFiles = mp3.countFiles(MP3_SRC_BUILTIN);
-    mediaType = MP3_SRC_BUILTIN;
+   // numFiles = mp3.countFiles(MP3_SRC_BUILTIN);
+   //mediaType = MP3_SRC_BUILTIN;
     //////////////////////////////////////
-  */
+
 
 
 
@@ -579,7 +557,7 @@ void setup() {
 void loop() {
   /*
     //----------------- JQ6500 ------------------//
-    if (mp3.getStatus() != MP3_STATUS_PLAYING)
+    //if (mp3.getStatus() != MP3_STATUS_PLAYING)
     {
       mp3.playFileByIndexNumber(audiofile);
       mp3.play();
@@ -591,27 +569,38 @@ void loop() {
   }
   client.loop();
 
+  //----------------- JQ6500 ------------------//
+  if (mp3.getStatus() != MP3_STATUS_PLAYING)
+  {
+    mp3.playFileByIndexNumber(ledAudioPattern);
+    mp3.play();
+  }
+
   // Call the current pattern function once, updating the 'leds' array
   gPatterns[gCurrentPatternNumber]();
 
   // send the 'leds' array out to the actual LED strip
-  FastLED.show();  
+  FastLED.show();
   // insert a delay to keep the framerate modest
-  FastLED.delay(1000/FRAMES_PER_SECOND); 
+  FastLED.delay(1000 / FRAMES_PER_SECOND);
 
   // do some periodic updates
-  EVERY_N_MILLISECONDS( 20 ) { gHue++; } // slowly cycle the "base color" through the rainbow
-  EVERY_N_SECONDS( holdPattern ) { nextPattern(); } // change patterns periodically
+  EVERY_N_MILLISECONDS( 20 ) {
+    gHue++;  // slowly cycle the "base color" through the rainbow
+  }
+  EVERY_N_SECONDS( holdPattern ) {
+    nextPattern();  // change patterns periodically
+  }
 }
 
 
 void nextPattern()
 { // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern courant stocké dans ledstate
-   //mosquitto_pub -t modestate -m 0 
+  //mosquitto_pub -t modestate -m 0
   if (modePattern = 0) {
-  // add one to the current pattern number, and wrap around at the end
-  gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
+    // add one to the current pattern number, and wrap around at the end
+    gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
   }
   else
-  setPattern();
+    setPattern();
 }
