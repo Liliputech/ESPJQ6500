@@ -24,7 +24,7 @@
 #define FASTLED_SHOW_CORE 0
 #define NUM_LEDS 300 // 5 mètres de WS2813B en 60 leds/mètre
 #define LEDSTRIP 0 // ledstrip connecté au GPIO 0 de l'ESP01
-
+#define BRIGHTNESS  85
 
 
 
@@ -50,10 +50,9 @@ String payloadFromMQTT = "";
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
-byte ledPattern = 0; // pattern # : 255 patterns maximum
-byte hold = 1; // number of loops : 255 loop maximum , 0 = perpetual loop
-bool blocLoop = false; //avoid infinite loop()
-//bool blocLoop2 = false;
+byte ledAudioPattern = 0; // pattern # : 255 patterns maximum
+byte holdPattern = 10; // nombre de secondes à jouer le ledAudioPattern courant
+byte modePattern = 0; //mode d'enchainement des patterns : 0 = enchainer
 
 String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX. Je ne choisi pas ce nom il est dans l'ESP de base
 String topicName = clientID + "/#";//Topic individuel nominatif pour publier un message unique à un ESP unique
@@ -195,14 +194,11 @@ void addGlitter( fract8 chanceOfGlitter)
 
 
 //-------FADE OUT--------
-//anciennement fadeall()
 void p0() {
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i].nscale8(250);
+    leds.nscale8();
     FastLED.show();
-    delay(10);
+    delay(5);
   }
-  blocLoop = false;//close flag : la boucle ne continue pas plus que "hold" fois
   Serial.println("fadeall done!");
 }
 
@@ -242,6 +238,7 @@ void p2()
 }
 
 //---------Path-drik.ino : allumage successif non maintenu en avant--------
+//https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
 void p3()
 {
   // First slide the led in one direction
@@ -395,83 +392,70 @@ void callback(char* topic, byte* payload, unsigned int length)
   Serial.print(topic);
   Serial.print("] ");
 
-  //-----Si le topic est holdstate-----
-  //On identifie le topic que l'on veut traiter grâce à strcmp() pour "String Compare" : strcmp retourne un 0 si les deux string sont équivalentes
-  //https://www.baldengineer.com/multiple-mqtt-topics-pubsubclient.html
-  //référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
+
+//On identifie le topic que l'on veut traiter grâce à strcmp() pour "String Compare" : strcmp retourne un 0 si les deux string sont équivalentes
+//référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
+
+  
+  //-----durée en secondes pour tous les clients, exemple 10 secondes : mosquitto_pub -t holdstate -m 10 
   if (strcmp(topic, "holdstate") == 0) {//si le contenu de topic est holdstate alors retourne 0
-
-    //----On récupère le message-----
-    /*
-      MQTT transmets tout en ASCII donc pour obtenir un digit :
-
-      1) on récupère chaque caractère : on itère dans cellules du tableau payload
-      afin recueillir les caractères transmis et les placer dans un byte.
-      Donc si MQTT : [2][5][5] vers ESP01 : 255 (255 maximum car byte)
-      et
-      2) on transpose ASCII en nombre, car en ASCII 48 = 0
-
-      explications: si depuis le Broker j'envoie hold = 5 et ledPattern 3 (par ex.) alors j'obtiens dans le moniteur Arduino 53 fois le ledPattern 3
-      étant donné que ascii '5' vaut 53 donc je comprends que depuis le Broker j'envoies en ASCII et pas en nombre
-    */
-
-    for (int i = 0; i < length; i++) {
-      if (isDigit(payload[i]))
-        payloadFromMQTT += (char)payload[i];
+    for (int i = 0; i < length; i++) { //itérer dans toute la longueur message, length est fourni dans le callback MQTT
+      if (isDigit(payload[i]))// tester si le payload est bien un chiffre décimal 
+        payloadFromMQTT += (char)payload[i];//caster en type char
     }
-    hold = payloadFromMQTT.toInt();
-    payloadFromMQTT = "";
-    Serial.print(hold);
+    holdPattern = payloadFromMQTT.toInt();//transformer la String en entier et stocker dans la variable 
+    payloadFromMQTT = "";//reset : vider la String pour le prochain payload
+    Serial.print(holdPattern);
   }
+  
 
-
-
-  //------Si le topic est ledstate (simile)-----
+  //------appel d'un ledAudioPattern de lumière+sons pour tous les clients -----
   else if  (strcmp(topic, "ledstate") == 0) {
     for (int i = 0; i < length; i++) {
       if (isDigit(payload[i]))
         payloadFromMQTT += (char)payload[i];
     }
-    ledPattern = payloadFromMQTT.toInt();
+    ledAudioPattern = payloadFromMQTT.toInt();
     payloadFromMQTT = "";
-    Serial.print(ledPattern);
-
-    if (ledPattern == 3 || ledPattern == 4 || ledPattern == 11 || ledPattern == 12 || ledPattern == 13) {//si les fonctions 3 ou 4 sont appelées
-      blocLoop = true;//orienter le processeur vers le nb de boucles à effectuer
-    }
-    //      else {
-    //        hold = 0;//BOUCLAGE PERPETUEL
-    //        client.publish("holdstate", "0"); //(-t , -m) càd publier l'état de la variable hold sur le topic "holdstate", pour une màj de l'interface graphique Paho-JS
-    Serial.println();
+    Serial.print(ledAudioPattern);
   }
 
 
-
-
-  //Si le topic est clientID/ledstate -
-  //exemple : mosquitto_pub -t ESP_2ABD4E/ledstate -m 3
+  //-----ledAudioPattern qui s'adresse à un unique clientID, exemple : mosquitto_pub -t ESP_2ABD4E/ledstate -m 3
   else  if (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) {
     for (int i = 0; i < length; i++) {
-      ledPattern = (byte)payload[i] - 48;
-      Serial.print(ledPattern);
-      if (ledPattern == 3 || ledPattern == 4 || ledPattern == 11 || ledPattern == 12 || ledPattern == 13) {
-        blocLoop = true;//orienter le processeur vers le nb de boucles à effectuer
-      }
-      //      else {
-      //        hold = 0;//BOUCLAGE PERPETUEL
-      //        client.publish("holdstate", "0"); //(-t , -m) càd publier l'état de la variable hold sur le topic "holdstate", pour une màj de l'interface graphique Paho-JS
+        if (isDigit(payload[i]))
+        payloadFromMQTT += (char)payload[i];
     }
-    Serial.println();
-  }
+      ledAudioPattern = payloadFromMQTT.toInt();
+    payloadFromMQTT = "";
+    Serial.print(ledAudioPattern);
+    }
 
 
-
-  //Si le topic est clientID/holdstate - simile
-  else if (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) {
+//----- durée en secondes qui s'adresse à un unique clientID, exemple : mosquitto_pub -t ESP_2ABD4E/holdstate -m 10
+  else  if (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) {
     for (int i = 0; i < length; i++) {
-      hold = (byte)payload[i] - 48; //
-      Serial.print(hold);
+        if (isDigit(payload[i]))
+        payloadFromMQTT += (char)payload[i];
     }
+      holdPattern = payloadFromMQTT.toInt();
+    payloadFromMQTT = "";
+    Serial.print(holdPattern);
+    }
+
+//-----Si le topic est modestate : 
+//0 = enchainement de tout le tableau gPatterns en restant sur chaque pattern holdPattern secondes et 1 = jouer uniquement le pattern ledAudioPattern
+  else  if (strcmp(topic, "modestate") == 0) {
+    for (int i = 0; i < length; i++) {
+        if (isDigit(payload[i]))
+        payloadFromMQTT += (char)payload[i];
+    }
+      modePattern = payloadFromMQTT.toInt();
+    payloadFromMQTT = "";
+    Serial.print(ledAudioPattern);
+    }
+    
     Serial.println();
   }
 
@@ -496,41 +480,14 @@ void callback(char* topic, byte* payload, unsigned int length)
 
 }
 
-
-
-
-//----- Correspondance MQTT Pattern -> Leds Fonctions---------
-//array of function pointers
-//https://www.geeksforgeeks.org/how-to-declare-a-pointer-to-a-function/
-//https://www.geeksforgeeks.org/function-pointer-in-c/
-
-//------ array de pointeurs vers des fonctions ------
-//https://forum.arduino.cc/index.php?topic=610508.0
-//l'idée est de faire pointer la variable ledPattern qui est un byte entre 0 et 9, vers les fonctions respectives p0() à p9()
-//l'utilisation d'un typedef éclairci l'écriture
-
-typedef void (*voidfunc)();// avec typedef on créé un type inexistant
-voidfunc func[] = {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13};//le tableau func[] est de type voidfunc, càd pointeur vers fonction
-
-//sizeof : https://www.arduino.cc/reference/en/language/variables/utilities/sizeof/
-//determine la taille de l'array automatiquement, pour éviter de casser le code si on ajoute des fonctions.
-int nFunc = sizeof(func) / sizeof(func[0]); // sizeof returns the total number of bytes.
-
-void setPattern() {
-  if ((ledPattern >= 1) && (ledPattern <= nFunc))
-  {
-    func[ledPattern](); //-1 car sinon, en envoyant un message MQTT 1, il me joue l'index func[1] soit la fonction p2() et non la fonction p1()
-  }
-}
-
 /*IDEM
   void (*func_ptr[])() = {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9};
 
   void setPattern(){
 
-  if((ledPattern>=0)&&(ledPattern<=9))
+  if((ledAudioPattern>=0)&&(ledAudioPattern<=9))
   {
-   (*func_ptr[ledPattern])();
+   (*func_ptr[ledAudioPattern])();
   }
   }
 */
@@ -578,7 +535,7 @@ void setup() {
   client.setCallback(callback);
 
   LEDS.addLeds<WS2812B, LEDSTRIP, GRB>(leds, NUM_LEDS);//GRB et non RGB car le rouge et le vert sont inversés pour les WS2813B
-  LEDS.setBrightness(84);// (255) = puissance maximale -----> ATTENTION POWER !
+  LEDS.setBrightness(BRIGHTNESS);// (255) = puissance maximale -----> ATTENTION POWER !
 
   //indique dans le moniteur le nombre de fonctions à disposition
   Serial.print("le nombre de fonctions diponibles est :");
@@ -590,6 +547,43 @@ void setup() {
 
 
 
+//----- Correspondance MQTT Pattern -> Leds Fonctions---------
+//------------------------REF----------------------------------
+//array of function pointers
+//https://www.geeksforgeeks.org/how-to-declare-a-pointer-to-a-function/
+//https://www.geeksforgeeks.org/function-pointer-in-c/
+
+//------ array de pointeurs vers des fonctions ------
+//https://forum.arduino.cc/index.php?topic=610508.0
+//l'idée est de faire pointer la variable ledAudioPattern, vers la fonction respective
+//exemple:  ledstate = 1 -> appel de p1()
+
+//l'utilisation d'un typedef éclairci l'écriture
+typedef void (*voidfunc)();// avec typedef on créé un type inexistant
+voidfunc func[] = {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13};//le tableau func[] est de type voidfunc, càd pointeur vers fonction
+
+//sizeof : https://www.arduino.cc/reference/en/language/variables/utilities/sizeof/
+//determine la taille de l'array automatiquement, pour éviter de casser le code si on ajoute des fonctions.
+int nFunc = sizeof(func) / sizeof(func[0]); // sizeof returns the total number of bytes.
+
+
+void setPattern() {
+  if ((ledAudioPattern >= 1) && (ledAudioPattern <= nFunc))
+  {
+    gCurrentPatternNumber= func[ledAudioPattern](); //-1 car sinon, en envoyant un message MQTT 1, il me joue l'index func[1] soit la fonction p2() et non la fonction p1()
+  }
+}
+
+
+
+// List of patterns to cycle through.  Each is defined as a separate function below.
+typedef void (*SimplePatternList[])();
+SimplePatternList gPatterns = { p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 };
+
+uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
+uint8_t gHue = 0; // rotating "base color" used by many of the patterns
+
+
 void loop() {
   /*
     //----------------- JQ6500 ------------------//
@@ -599,47 +593,33 @@ void loop() {
       mp3.play();
     }
   */
-
-  //do some periodic updates
-  EVERY_N_MILLISECONDS( 20 ) {
-    gHue++;  // slowly cycle the "base color" through the rainbow
-  }
-
   if (!client.connected())
   {
     reconnect();
   }
   client.loop();
 
+  // Call the current pattern function once, updating the 'leds' array
+  gPatterns[gCurrentPatternNumber]();
 
-  //BOUCLAGE INFINI
-  if (hold == 0) { //si la variable hold est 0 on boucle perpétuellement setPattern()
-    setPattern();//on appelle effectivement la fonction correspondante au message MQTT
+  // send the 'leds' array out to the actual LED strip
+  FastLED.show();  
+  // insert a delay to keep the framerate modest
+  FastLED.delay(1000/FRAMES_PER_SECOND); 
 
-    Serial.print(">");
-    Serial.print(ledPattern);//on imprime le n° de ledPattern à chaque fois qu'on le rejoue
-    Serial.println("<");
+  // do some periodic updates
+  EVERY_N_MILLISECONDS( 20 ) { gHue++; } // slowly cycle the "base color" through the rainbow
+  EVERY_N_SECONDS( hold ) { nextPattern(); } // change patterns periodically
+}
+
+
+void nextPattern()
+{ // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern courant stocké dans ledstate
+   //mosquitto_pub -t modestate -m 0 
+  if modestate = 0{
+  // add one to the current pattern number, and wrap around at the end
+  gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
   }
-
-
-  //BOUCLAGE "HOLD" FOIS
-  else  { //patterns qui doivent se reproduire en nombre de bouclages définis par la variable hold
-    if (blocLoop == true) { // open flag : cette condition permet d'éviter que le pattern ci-dessous ne continue indéfiniement dans loop()
-      for (int i = 0; i < hold ; i++); { //on va répéter la fonction setPattern() "hold" fois
-        setPattern();//on appelle effectivement la fonction correspondante au message MQTT
-
-        Serial.print(">");
-        Serial.print(ledPattern);//on imprime le n° de ledPattern à chaque fois qu'on le rejoue
-        Serial.println("<");
-      }
-      p0();//on fait un fondu général pour ne rien laisser allumer ("fadeall, done!")
-
-      //cette ligne afin d'éviter que le dernier pattern en mémoire ne démarre automatiquement si on fait une publication du type:
-      //mosquitto_pub -t holdstate -m 0 // càd une demande de bouclage infinie juste avant de lancer un nouveau pattern
-      ledPattern = 0;
-
-      blocLoop = false;//close flag : la boucle ne continue pas plus que "hold" fois
-      Serial.println("fadeall done!");
-    }
-  }
+  else
+  setPattern();
 }
