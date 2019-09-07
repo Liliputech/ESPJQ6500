@@ -1,12 +1,11 @@
 
-
 //------Bibliothèques et Settings------
 
 //AUDIO LIBS
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include <JQ6500_Serial.h>
-
+#include <WifiConfig.h>
 
 //MQTT LIBS
 #include <PubSubClient.h>//https://pubsubclient.knolleary.net/api.html
@@ -17,7 +16,7 @@
 //4 lignes nécessaires pour éviter un flash intempestif récurrent...
 // -- The core to run FastLED.show()
 #define FASTLED_ALLOW_INTERRUPTS 0
-#include "FastLED.h"
+#include <FastLED.h>
 
 //LEDSTRIPS SETTINGS
 #define FASTLED_USING_NAMESPACE
@@ -34,15 +33,15 @@
 CRGB leds[NUM_LEDS];// Define the array of leds
 static uint8_t hue = 0;//hue variable
 
-JQ6500_Serial mp3(3, 2); //les deux GPIO sont utilisés par la lib. SoftwareSerial comme ports série virtuels
+JQ6500_Serial mp3; //les deux GPIO sont utilisés par la lib. SoftwareSerial comme ports série virtuels
 /*
 unsigned int audiofile; // numéro du fichier audio à lire
 unsigned int numFiles; // Total number of files on media (autodetected in setup())
 byte mediaType;        // Media type (autodetected in setup())
 //*/
 
-char ssid[] = "";
-char password[] = "";
+char ssid[] = WIFI_SSID;
+char password[] = WIFI_PASSWORD;
 IPAddress mon_broker(192, 168, 0, 16);
 
 WiFiClient ESP01client;
@@ -501,7 +500,7 @@ void setPattern() {
 }
 
 void setup() {
-  Serial.begin(74880);
+  Serial.begin(115200);
   delay(10);
 
   //////////// ESP01 settings //////////
@@ -519,7 +518,7 @@ void setup() {
   //////////////////// JQ6500 settings ////////////////////
 
     //----------------Initialisation module audio--------------
-    mp3.begin(9600);
+    mp3.begin(9600,3,2);
     mp3.reset();
     mp3.setVolume(40);
     mp3.setLoopMode(MP3_LOOP_NONE);
@@ -553,6 +552,19 @@ void setup() {
 
   getName();
 }
+
+
+void nextPattern()
+{ // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern courant stocké dans ledstate
+  //mosquitto_pub -t modestate -m 0
+  if (modePattern = 0) {
+    // add one to the current pattern number, and wrap around at the end
+    gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
+  }
+  else
+    setPattern();
+}
+
 
 void loop() {
   /*
@@ -591,16 +603,4 @@ void loop() {
   EVERY_N_SECONDS( holdPattern ) {
     nextPattern();  // change patterns periodically
   }
-}
-
-
-void nextPattern()
-{ // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern courant stocké dans ledstate
-  //mosquitto_pub -t modestate -m 0
-  if (modePattern = 0) {
-    // add one to the current pattern number, and wrap around at the end
-    gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
-  }
-  else
-    setPattern();
 }
