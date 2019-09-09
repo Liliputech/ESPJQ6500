@@ -11,6 +11,13 @@
 #include <PubSubClient.h>//https://pubsubclient.knolleary.net/api.html
 #include <ESP8266WiFi.h>//https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/station-class.html
 
+//For OTA Update
+#include <ESP8266mDNS.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266HTTPUpdateServer.h>
+
+ESP8266WebServer httpServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
 
 //LEDSTRIPS LIBS
 //4 lignes nécessaires pour éviter un flash intempestif récurrent...
@@ -42,7 +49,7 @@ byte mediaType;        // Media type (autodetected in setup())
 
 char ssid[] = WIFI_SSID;
 char password[] = WIFI_PASSWORD;
-IPAddress mon_broker(192, 168, 0, 16);
+IPAddress mon_broker(BROKER_IP);
 
 WiFiClient ESP01client;
 PubSubClient client(ESP01client);
@@ -551,6 +558,12 @@ void setup() {
   Serial.println();
 
   getName();
+
+  //OTA Update setup
+  MDNS.begin(clientID);
+  httpUpdater.setup(&httpServer);
+  httpServer.begin();
+  MDNS.addService("http", "tcp", 80);
 }
 
 
@@ -575,6 +588,9 @@ void loop() {
       mp3.play();
     }
   */
+  //OTA Update Check
+  httpServer.handleClient();
+
   if (!client.connected())
   {
     reconnect();
