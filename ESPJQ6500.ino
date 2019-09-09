@@ -53,7 +53,6 @@ IPAddress mon_broker(BROKER_IP);
 
 WiFiClient ESP01client;
 PubSubClient client(ESP01client);
-String payloadFromMQTT = "";
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
 byte ledAudioPattern = 0; // pattern # : 255 patterns maximum
@@ -62,37 +61,10 @@ byte modePattern = 0; //mode d'enchainement des patterns : 0 = enchainer
 
 String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX. Je ne choisi pas ce nom il est dans l'ESP de base
 String topicName = clientID + "/#";//Topic individuel nominatif pour publier un message unique à un ESP unique
+String debugMessage = "";
 
 uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
-
-/*
-  std::String defName = WiFi.hostname().c_str();
-  char * S = new char[defName.length()+1];
-  std::strcpy(S, defName.c_str());
-  //https://stackoverflow.com/questions/12862739/convert-string-to-char
-  //http://www.cplusplus.com/forum/general/100714/
-*/
-
-/*
-  String clientID = WiFi.hostname().c_str();//on récupère le nom de l'ESP en tant que String
-  char * defName = (char*)clientID.c_str(); //que l'on converti en char pour compatibilité avec la fonction callback
-*/
-
-/*
-  //Concaténer 1? https://www.baldengineer.com/multiple-mqtt-topics-pubsubclient.html
-  //String stringTwo;
-  //stringTwo.concat((char)payload[i]);
-
-  //Concaténer 2 ?: https://www.arduino.cc/en/Tutorial/StringAdditionOperator
-  //char * defNameSharp = (char*)clientID.c_str() + '/' + '#';// on ajout /# à ESP_XXXXX donc ça fait ESP_XXXX/#
-
-  //https://github.com/knolleary/pubsubclient/issues/105
-  //////////////////////////////////////////////////////////////////////////////////////////////
-
-  //OTA: https://arduino-esp8266.readthedocs.io/en/latest/ota_updates/readme.html
-
-*/
 
 
 //-------------FONCTION WIFI : connexion, IP -------------
@@ -102,37 +74,11 @@ void setup_wifi() {
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  //https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/generic-class.html#mode
-  //WiFi.mode(m): set mode to WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF
-  //WiFi.mode(WIFI_STA);// Inutile puisqu'on a WiFi.begin
-
-  ///https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/station-class.html#start-here
-  //inutile de spécifier le mode avec  WiFi.mode(WIFI_STA);
-  //begin : Switching the module to Station mode is done with begin function
-  //et par défaut l'ESP va tenter de se reconnecter au réseau Wifi indiqué s'il en est déconnecté
-
-  //https://github.com/esp8266/Arduino/issues/2826  -> set esp name
-  //https://github.com/esp8266/Arduino/issues/5695 -> issue DHCP hostname
-
-  //prints ESP_XXXX
-  //Serial.printf("la variable defname contient: %s\n", defName);
-  //Serial.printf("Default hostname: %s\n", WiFi.hostname().c_str());
-
-  //WiFi.hostname("WebPool");//nommer l'esp WebPool dans la freebox > DHCP
   WiFi.begin(ssid, password);
-  //WiFi.setHostname("WebPool");//selon la lib avant ou après begin
-
-  //https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/station-class.html#hostname
-
-
-  //defName = WiFi.hostname().c_str();
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-
-    //You can pass flash-memory based strings to Serial.print() by wrapping them with F().
-    //file:///Applications/Arduino.app/Contents/Java/reference/www.arduino.cc/en/Serial/Print.html
-    Serial.print(F("."));
+    Serial.print(".");
   }
 
   randomSeed(micros());
@@ -143,13 +89,10 @@ void setup_wifi() {
 }
 
 
-//nom de l'ESP
+//publie le nom de l'ESP sur le topic /welcome
 void getName() {
-  //https://pubsubclient.knolleary.net/api.html#publish1
-  client.publish("welcome", clientID.c_str());//defName.c_str()) ; //WiFi.hostname().c_str());//clientId.c_str());//publie le nom DHCP de l'esp01S sur le topic welcome
+  client.publish("welcome", clientID.c_str());
   Serial.printf("topic welcome : %s\n", clientID.c_str());
-  //Serial.printf("topic welcome : %s\n", defNameSharp);//nothing in monitor
-
 }
 
 
@@ -157,36 +100,19 @@ void getName() {
 void reconnect()
 {
   // Loop until we're reconnected
+  Serial.println("tentative de connexion au broker Mosquitto...");
   while (!client.connected()) {
-    Serial.print("tentative de connexion au broker Mosquitto...");
-    Serial.println();
-
-    ////////////////////////////////////////
-    // Nom généré aléatoirement. todo: comment récupérer le nom de l'ESP
-    //clientId += String(random(0xffff), HEX);
-    ////////////////////////////////////////
-
-    //(clientID, username, password) https://pubsubclient.knolleary.net/api.html#connect3
-    if (client.connect(clientID.c_str(), "usr", "mqttpass"));//(defName.c_str(), "usr", "mqttpass"))
-    {
-      Serial.println("connexion au Broker Mosquitto OK !!");
-
-      //publie Hello world ... et ESP8266Client-XXXX sur le topic welcome
-      //client.publish("welcome", "hello world, ici ESP01");
-      //client.publish("welcome", defName.c_str());//clientId.c_str());
-
-      //Souscription topics ledstate et holdstate
-      //boolean subscribe (topic, [qos])  https://pubsubclient.knolleary.net/api.html#subscribe
-      client.subscribe("ledstate");
-      client.subscribe("holdstate");
-      client.subscribe(topicName.c_str());
-
-      //client.subscribe(WiFi.hostname().c_str());//souscrit au topic qui porte son nom DHCP
-      //client.subscribe(defName + '/' +'#');
-      //client.subscribe(defNameSharp.c_str());
-      delay(10);
-    }
+    if(client.connect(clientID.c_str()))
+      break;
+    Serial.print('.');
+    delay(10);
   }
+
+  client.subscribe("ledstate");
+  client.subscribe("holdstate");
+  client.subscribe(topicName.c_str());
+
+  Serial.println("connexion au Broker Mosquitto OK !!");
 }
 
 
@@ -364,6 +290,14 @@ void p13() {
 
 /////////////////////////////////////////////////////////
 
+int payloadToInt(byte* payload, int length){
+  String payloadFromMQTT = "";
+  for (int i = 0; i < length; i++) { //itérer dans toute la longueur message, length est fourni dans le callback MQTT
+    if (isDigit(payload[i]))// tester si le payload est bien un chiffre décimal
+      payloadFromMQTT += (char)payload[i];//caster en type char
+  }
+  return payloadFromMQTT.toInt();//transformer la String en entier et renvoyer la conversion en integer
+}
 
 //-------------FONCTION CALLBACK------------
 //l'étoile * means a pointer to the given type. Explained in chapter 1 of any C book
@@ -371,108 +305,37 @@ void p13() {
 void callback(char* topic, byte* payload, unsigned int length)
 {
 
-  //Affichage dans le moniteur du -t topic et du - m message
-  Serial.print("Topic entrant : [");
-  Serial.print(topic);
-  Serial.print("] ");
+  //Affichage dans le moniteur (topic welcome) du -t topic et du - m message
+  debugMessage = clientID + " - Topic entrant : [" + topic + "] ";
 
 
   //On identifie le topic que l'on veut traiter grâce à strcmp() pour "String Compare" : strcmp retourne un 0 si les deux string sont équivalentes
   //référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
 
-
-  //-----durée en secondes pour tous les clients, exemple 10 secondes : mosquitto_pub -t holdstate -m 10
-  if (strcmp(topic, "holdstate") == 0) {//si le contenu de topic est holdstate alors retourne 0
-    for (int i = 0; i < length; i++) { //itérer dans toute la longueur message, length est fourni dans le callback MQTT
-      if (isDigit(payload[i]))// tester si le payload est bien un chiffre décimal
-        payloadFromMQTT += (char)payload[i];//caster en type char
-    }
-    holdPattern = payloadFromMQTT.toInt();//transformer la String en entier et stocker dans la variable
-    payloadFromMQTT = "";//reset : vider la String pour le prochain payload
-    Serial.print(holdPattern);
+  //-----durée en secondes pour tous les clients ou ce client, exemple 10 secondes : mosquitto_pub -t holdstate -m 10
+  if ( (strcmp(topic, (clientID + "/holdstate").c_str()) == 0)
+       || (strcmp(topic, "holdstate") == 0)) {
+    holdPattern = payloadToInt(payload,length);
+    debugMessage += holdPattern;
   }
 
-
-  //------appel d'un ledAudioPattern de lumière+sons pour tous les clients -----
-  else if  (strcmp(topic, "ledstate") == 0) {
-    for (int i = 0; i < length; i++) {
-      if (isDigit(payload[i]))
-        payloadFromMQTT += (char)payload[i];
-    }
-    ledAudioPattern = payloadFromMQTT.toInt();
-    payloadFromMQTT = "";
-    Serial.print(ledAudioPattern);
-  }
-
-
-  //-----ledAudioPattern qui s'adresse à un unique clientID, exemple : mosquitto_pub -t ESP_2ABD4E/ledstate -m 3
-  else  if (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) {
-    for (int i = 0; i < length; i++) {
-      if (isDigit(payload[i]))
-        payloadFromMQTT += (char)payload[i];
-    }
-    ledAudioPattern = payloadFromMQTT.toInt();
-    payloadFromMQTT = "";
-    Serial.print(ledAudioPattern);
-  }
-
-
-  //----- durée en secondes qui s'adresse à un unique clientID, exemple : mosquitto_pub -t ESP_2ABD4E/holdstate -m 10
-  else  if (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) {
-    for (int i = 0; i < length; i++) {
-      if (isDigit(payload[i]))
-        payloadFromMQTT += (char)payload[i];
-    }
-    holdPattern = payloadFromMQTT.toInt();
-    payloadFromMQTT = "";
-    Serial.print(holdPattern);
+  //------appel d'un ledAudioPattern de lumière+sons pour tous les clients ou ce client -----
+  if ( (strcmp(topic, (clientID + "/ledstate").c_str()) == 0)
+       || (strcmp(topic, "ledstate") == 0)) {
+    ledAudioPattern = payloadToInt(payload,length);
+    debugMessage += ledAudioPattern;
   }
 
   //-----Si le topic est modestate :
   //0 = enchainement de tout le tableau gPatterns en restant sur chaque pattern holdPattern secondes et 1 = jouer uniquement le pattern ledAudioPattern
-  else  if (strcmp(topic, "modestate") == 0) {
-    for (int i = 0; i < length; i++) {
-      if (isDigit(payload[i]))
-        payloadFromMQTT += (char)payload[i];
-    }
-    modePattern = payloadFromMQTT.toInt();
-    payloadFromMQTT = "";
-    Serial.print(ledAudioPattern);
+  if (strcmp(topic, "modestate") == 0) {
+    modePattern = payloadToInt(payload,length);
+    debugMessage += modePattern;
   }
 
-  Serial.println();
+  client.publish("welcome", debugMessage.c_str());
 }
 
-/*
-   https://github.com/knolleary/pubsubclient/issues/334
-   The publish functions expect char[] types to be passed in rather than Strings.
-   You need to use the String.toCharArray() function to convert your strings to the necessary type.
-   Si le topic est "welcome"
-*/
-/*
-  else if (strcmp(topic, "welcome") == 0) {
-
-  //toCharArray() -> https://www.arduino.cc/reference/en/language/variables/data-types/string/functions/tochararray/
-  int[] welcomeTOchar = welcome.toCharArray();
-
-  client.publish(welcomeTOchar[], clientID);
-      Serial.print(clientID);
-    }
-    Serial.println();
-  }
-*/
-
-/*IDEM
-  void (*func_ptr[])() = {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9};
-
-  void setPattern(){
-
-  if((ledAudioPattern>=0)&&(ledAudioPattern<=9))
-  {
-   (*func_ptr[ledAudioPattern])();
-  }
-  }
-*/
 //////////////////////////////////////////////////////////////
 
 
@@ -524,21 +387,18 @@ void setup() {
 
   //////////////////// JQ6500 settings ////////////////////
 
-    //----------------Initialisation module audio--------------
-    mp3.begin(9600,3,2);
-    mp3.reset();
-    mp3.setVolume(40);
-    mp3.setLoopMode(MP3_LOOP_NONE);
-    mp3.setEqualizer(MP3_EQ_NORMAL);
+  //----------------Initialisation module audio--------------
+  mp3.begin(9600,3,2);
+  mp3.reset();
+  mp3.setVolume(40);
+  mp3.setLoopMode(MP3_LOOP_NONE);
+  mp3.setEqualizer(MP3_EQ_NORMAL);
 
-    // we select the built in source NOT SD card source
-    mp3.setSource(MP3_SRC_BUILTIN);
-   // numFiles = mp3.countFiles(MP3_SRC_BUILTIN);
-   //mediaType = MP3_SRC_BUILTIN;
-    //////////////////////////////////////
-
-
-
+  // we select the built in source NOT SD card source
+  mp3.setSource(MP3_SRC_BUILTIN);
+  // numFiles = mp3.countFiles(MP3_SRC_BUILTIN);
+  //mediaType = MP3_SRC_BUILTIN;
+  //////////////////////////////////////
 
   setup_wifi();
 
