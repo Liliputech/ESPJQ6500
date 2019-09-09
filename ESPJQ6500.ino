@@ -28,12 +28,18 @@ ESP8266HTTPUpdateServer httpUpdater;
 //LEDSTRIPS SETTINGS
 #define FASTLED_USING_NAMESPACE
 #define FASTLED_SHOW_CORE 0
-#define NUM_LEDS 300 // 5 mètres de WS2813B en 60 leds/mètre
+#define NUM_LEDS 30 // 5 mètres de WS2813B en 60 leds/mètre
 #define LEDSTRIP 0 // ledstrip connecté au GPIO 0 de l'ESP01
-#define BRIGHTNESS  85
+#define BRIGHTNESS  30
 #define FRAMES_PER_SECOND  120
+
+//sizeof : https://www.arduino.cc/reference/en/language/variables/utilities/sizeof/
+//determine la taille de l'array automatiquement, pour éviter de casser le code si on ajoute des fonctions.
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
+//Helper macro to cycle through the leds
+#define CYCLE_LED(A) A = (A+1) % NUM_LEDS
+#define REVERSE_CYCLE_LED(A) A = (A-1) % NUM_LEDS
 
 //------------VARIABLES--------------//
 
@@ -108,9 +114,6 @@ void connect_mqtt()
   Serial.printf("topic welcome : %s\n", clientID.c_str());
 }
 
-
-
-
 //---------DemoReel100: addGlitter--------
 void addGlitter( fract8 chanceOfGlitter)
 {
@@ -119,15 +122,13 @@ void addGlitter( fract8 chanceOfGlitter)
   }
 }
 
-
 //-------FADE OUT--------
 void p0() {
   static int i = 0;
   fadeToBlackBy(leds, NUM_LEDS, 0);//https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
   delay(5);
-  i = (i + 1) % NUM_LEDS;
+  CYCLE_LED(i);
 }
-
 
 //--------FONCTION DE BOUCLAGE DES PATTERNS-------
 //////////////////////////////////// PATTERNS p1() à p10() ///////////////////////////////////////
@@ -138,17 +139,17 @@ void p1()
   // Set the i'th led to red
   leds[i] = CHSV(hue++, 255, 255);
   delay(30);
-  i = (i + 1) % NUM_LEDS;
+  CYCLE_LED(i);
 }
 
 //---------allumage successif maintenu en arrière--------
 void p2()
 {
-  static int i = 0;
+  static int i = NUM_LEDS;
   // Set the i'th led to red
   leds[i] = CHSV(hue++, 255, 255);
   delay(30);
-  i = (i + 1) % NUM_LEDS;
+  REVERSE_CYCLE_LED(i);
 }
 
 //---------Path-drik.ino : allumage successif non maintenu en avant--------
@@ -160,17 +161,17 @@ void p3()
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
   delay(5);
-  i = (i + 1) % NUM_LEDS;
+  CYCLE_LED(i);
 }
 
 //---------Path-drik.ino : allumage non maintenu en arrière--------
 void p4()
 {
-  static int i = 0 ;
-  if ( i > 0) leds[i - 1] = CRGB::Black;
+  static int i = NUM_LEDS;
+  if ( i < NUM_LEDS) leds[i + 1] = CRGB::Black;
   leds[i] = CRGB::Blue;
   delay(5);
-  i = (i + 1) % NUM_LEDS;
+  REVERSE_CYCLE_LED(i);
 }
 
 //--------- DemoReel100: juggle--------
@@ -181,9 +182,6 @@ void p5() {
   for ( int i = 0; i < 8; i++) {
     leds[beatsin16( i + 7, 0, NUM_LEDS - 1 )] |= CHSV(dothue, 200, 255);
     dothue += 32;
-
-    // send the 'leds' array out to the actual LED strip
-
     delay(20);
   }
 }
@@ -191,17 +189,15 @@ void p5() {
 //---------DemoReel100: bpm--------
 void p6() {
   // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
+  static int i=0;
   uint8_t BeatsPerMinute = 62;
   CRGBPalette16 palette = PartyColors_p;
   uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
-  for ( int i = 0; i < NUM_LEDS; i++) { //9948
-    leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
-
-    // send the 'leds' array out to the actual LED strip
-
-    delay(20);
-  }
+  leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
+  delay(20);
+  CYCLE_LED(i);
 }
+
 //---------DemoReel100: sinelon--------
 void p7()
 {
@@ -209,9 +205,6 @@ void p7()
   fadeToBlackBy( leds, NUM_LEDS, 20);
   int pos = beatsin16( 13, 0, NUM_LEDS - 1 );
   leds[pos] += CHSV( gHue, 255, 192);
-
-  // send the 'leds' array out to the actual LED strip
-
   delay(20);
 }
 
@@ -222,9 +215,6 @@ void p8()
   fadeToBlackBy( leds, NUM_LEDS, 10);
   int pos = random16(NUM_LEDS);
   leds[pos] += CHSV( gHue + random8(64), 200, 255);
-
-  // send the 'leds' array out to the actual LED strip
-
   delay(20);
 }
 
@@ -233,9 +223,6 @@ void p9()
 {
   // FastLED's built-in rainbow generator
   fill_rainbow( leds, NUM_LEDS, gHue, 7);
-
-  // send the 'leds' array out to the actual LED strip
-
   delay(20);
 }
 
@@ -245,9 +232,6 @@ void p10()
   // built-in FastLED rainbow, plus some random sparkly glitter
   p9();
   addGlitter(80);
-
-  // send the 'leds' array out to the actual LED strip
-
   delay(20);
 }
 
@@ -259,7 +243,7 @@ void p11() {
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
   delay(5);
-  i = (i + 1) % NUM_LEDS;
+  CYCLE_LED(i);
 }
 //TEST BLEU
 void p12() {
@@ -268,7 +252,7 @@ void p12() {
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
   delay(5);
-  i = (i + 1) % NUM_LEDS;
+  CYCLE_LED(i);
 }
 
 //TEST VERT
@@ -278,7 +262,7 @@ void p13() {
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
   delay(5);
-  i = (i + 1) % NUM_LEDS;
+  CYCLE_LED(i);
 }
 
 /////////////////////////////////////////////////////////
@@ -343,22 +327,14 @@ void callback(char* topic, byte* payload, unsigned int length)
 //l'idée est de faire pointer la variable ledAudioPattern, vers la fonction respective
 //exemple:  ledstate = 1 -> appel de p1()
 
-//l'utilisation d'un typedef éclairci l'écriture
-typedef void (*voidfunc)();// avec typedef on créé un type inexistant
-voidfunc func[] = {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13};//le tableau func[] est de type voidfunc, càd pointeur vers fonction
-
-//sizeof : https://www.arduino.cc/reference/en/language/variables/utilities/sizeof/
-//determine la taille de l'array automatiquement, pour éviter de casser le code si on ajoute des fonctions.
-int nFunc = sizeof(func) / sizeof(func[0]); // sizeof returns the total number of bytes.
-
 // List of patterns to cycle through.  Each is defined as a separate function below.
 typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = { p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 };
+SimplePatternList gPatterns = { p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 };
 
 void setPattern() {
-  if ((ledAudioPattern >= 0) && (ledAudioPattern < nFunc))
+  if ((ledAudioPattern >= 0) && (ledAudioPattern < ARRAY_SIZE(gPatterns)))
   {
-    gCurrentPatternNumber = ledAudioPattern; //-1 car sinon, en envoyant un message MQTT 1, il me joue l'index func[1] soit la fonction p2() et non la fonction p1()
+    gCurrentPatternNumber = ledAudioPattern;
   }
 }
 
@@ -376,7 +352,6 @@ void setup() {
   //pinMode(3, OUTPUT);
   //SoftwareSerial.h en fait un port série virtuel, pas une sortie data classique !!
   ///////////////////////////////////////////////////////////////////////
-
 
   //////////////////// JQ6500 settings ////////////////////
   mp3.begin(9600,3,2);
@@ -419,8 +394,6 @@ void nextPattern()
     // add one to the current pattern number, and wrap around at the end
     gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
   }
-  else
-    setPattern();
 }
 
 
@@ -461,6 +434,7 @@ void loop() {
   EVERY_N_MILLISECONDS( 20 ) {
     gHue++;  // slowly cycle the "base color" through the rainbow
   }
+
   EVERY_N_SECONDS( holdPattern ) {
     nextPattern();  // change patterns periodically
   }
