@@ -88,16 +88,8 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-
-//publie le nom de l'ESP sur le topic /welcome
-void getName() {
-  client.publish("welcome", clientID.c_str());
-  Serial.printf("topic welcome : %s\n", clientID.c_str());
-}
-
-
 //-----------FONCTION MQTT/Mosquitto :connexion, souscription
-void reconnect()
+void connect_mqtt()
 {
   // Loop until we're reconnected
   Serial.println("tentative de connexion au broker Mosquitto...");
@@ -112,7 +104,8 @@ void reconnect()
   client.subscribe("holdstate");
   client.subscribe(topicName.c_str());
 
-  Serial.println("connexion au Broker Mosquitto OK !!");
+  client.publish("welcome", clientID.c_str());
+  Serial.printf("topic welcome : %s\n", clientID.c_str());
 }
 
 
@@ -308,7 +301,6 @@ void callback(char* topic, byte* payload, unsigned int length)
   //Affichage dans le moniteur (topic welcome) du -t topic et du - m message
   debugMessage = clientID + " - Topic entrant : [" + topic + "] ";
 
-
   //On identifie le topic que l'on veut traiter grâce à strcmp() pour "String Compare" : strcmp retourne un 0 si les deux string sont équivalentes
   //référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
 
@@ -386,18 +378,12 @@ void setup() {
 
 
   //////////////////// JQ6500 settings ////////////////////
-
-  //----------------Initialisation module audio--------------
   mp3.begin(9600,3,2);
   mp3.reset();
   mp3.setVolume(40);
   mp3.setLoopMode(MP3_LOOP_NONE);
   mp3.setEqualizer(MP3_EQ_NORMAL);
-
-  // we select the built in source NOT SD card source
   mp3.setSource(MP3_SRC_BUILTIN);
-  // numFiles = mp3.countFiles(MP3_SRC_BUILTIN);
-  //mediaType = MP3_SRC_BUILTIN;
   //////////////////////////////////////
 
   setup_wifi();
@@ -416,8 +402,6 @@ void setup() {
   Serial.print("le nombre de fonctions diponibles est :");
   Serial.println(nFunc);
   Serial.println();
-
-  getName();
 
   //OTA Update setup
   MDNS.begin(clientID);
@@ -440,21 +424,18 @@ void nextPattern()
 
 
 void loop() {
-  /*
-    //----------------- JQ6500 ------------------//
-    //if (mp3.getStatus() != MP3_STATUS_PLAYING)
-    {
-      mp3.playFileByIndexNumber(audiofile);
-      mp3.play();
-    }
-  */
   //OTA Update Check
   httpServer.handleClient();
 
+  //if not connected to Wifi tries to connect
+  if (WiFi.status() != WL_CONNECTED)
+    setup_wifi();
+
+  //if not connected to MQTT tries to connect
   if (!client.connected())
-  {
-    reconnect();
-  }
+    connect_mqtt();
+
+  //MQTT Refresh message queue
   client.loop();
 
   //----------------- JQ6500 ------------------//
