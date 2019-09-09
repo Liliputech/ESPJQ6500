@@ -66,6 +66,7 @@ String debugMessage = "";
 uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
+bool global_enabled = false; //ne pas afficher d'animation tant que pas de messages reçu en MQTT
 
 //-------------FONCTION WIFI : connexion, IP -------------
 void setup_wifi() {
@@ -297,7 +298,7 @@ int payloadToInt(byte* payload, int length){
 //https://stackoverflow.com/questions/55637077/looking-for-explanation-about-simple-function-declaration
 void callback(char* topic, byte* payload, unsigned int length)
 {
-
+  global_enabled = true;
   //Affichage dans le moniteur (topic welcome) du -t topic et du - m message
   debugMessage = clientID + " - Topic entrant : [" + topic + "] ";
 
@@ -437,6 +438,9 @@ void loop() {
 
   //MQTT Refresh message queue
   client.loop();
+
+  if (!global_enabled) //Global "display enable" flag
+    return;
 
   //----------------- JQ6500 ------------------//
   if (mp3.getStatus() != MP3_STATUS_PLAYING)
