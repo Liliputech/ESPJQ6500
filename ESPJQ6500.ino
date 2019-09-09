@@ -61,7 +61,6 @@ byte modePattern = 0; //mode d'enchainement des patterns : 0 = enchainer
 
 String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX. Je ne choisi pas ce nom il est dans l'ESP de base
 String topicName = clientID + "/#";//Topic individuel nominatif pour publier un message unique à un ESP unique
-String debugMessage = "";
 
 uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
@@ -298,6 +297,7 @@ int payloadToInt(byte* payload, int length){
 //https://stackoverflow.com/questions/55637077/looking-for-explanation-about-simple-function-declaration
 void callback(char* topic, byte* payload, unsigned int length)
 {
+  String debugMessage = "";
   global_enabled = true;
   //Affichage dans le moniteur (topic welcome) du -t topic et du - m message
   debugMessage = clientID + " - Topic entrant : [" + topic + "] ";
