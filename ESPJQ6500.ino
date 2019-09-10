@@ -1,4 +1,35 @@
+/*
+ * FastLED DOCS
+ * demoReel100 getstarted https://www.reddit.com/r/FastLED/comments/b2ceka/new_to_fastled_and_trying_to_understand_examples/
+ * Overview https://github.com/FastLED/FastLED/wiki/Overview 
+ * 
+ * FastLED's builtin functions https://github.com/FastLED/FastLED/blob/master/lib8tion.h
+ * 
+ * 1) fadeToBlack()
+ * Each time fadeToBlack is called it is dimming whatever current values a pixel has. 
+ * Again, because these functions are being called continuosly from each time through the programs main (void) loop, 
+ * pixels will keep getting darker and darker until they go to black or are assigned new values.
+ * fadeToBlackBy( leds, NUM_LEDS, 20); 
+ * This operates on the "leds" array, fading all pixels in this case 
+ * (since NUM_LEDS is specified, vs something less then NUM_LEDS), 
+ * and it fades by an amount of 20/256th, or about 7.8%.
+ * 
+ * 
+ * 2) beatsin16() 
+ * It takes the arguments beats/minute, a low value, and high value (and optionally also a time base and phase offset). 
+ * So in this case:
+ * int pos = beatsin16( 13, 0, NUM_LEDS-1 );
+ * is setup to do 13 BPM, cycling from 0 to NUM_LEDS-1 (ie from the first pixel to the last pixel in the strip). 
+ * That resulting pos number becomes the pixel position, leds[pos], when assigning color.
 
+ * 3) random() : nombreuse fonction random décrites dans lib8tion.h (lien plus haut)
+ * random16( n)    == random from 0..(N-1)
+ * random8()       == random from 0..255
+ * 
+*/
+
+ 
+ 
 //------Bibliothèques et Settings------
 
 //AUDIO LIBS
@@ -29,17 +60,20 @@ ESP8266HTTPUpdateServer httpUpdater;
 #define FASTLED_USING_NAMESPACE
 #define FASTLED_SHOW_CORE 0
 #define NUM_LEDS 30 // 5 mètres de WS2813B en 60 leds/mètre
-#define LEDSTRIP 0 // ledstrip connecté au GPIO 0 de l'ESP01
+#define DATA_PIN 0 // ledstrip connecté au GPIO 0 de l'ESP01
 #define BRIGHTNESS  30
 #define FRAMES_PER_SECOND  120
+#define COLOR_ORDER GRB //GRB et non RGB car le rouge et le vert sont inversés pour les WS2813B
+#define STRIPMODEL WS2812B
+
 
 //sizeof : https://www.arduino.cc/reference/en/language/variables/utilities/sizeof/
 //determine la taille de l'array automatiquement, pour éviter de casser le code si on ajoute des fonctions.
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
 //Helper macro to cycle through the leds
-#define CYCLE_LED(A) A = (A+1) % NUM_LEDS
-#define REVERSE_CYCLE_LED(A) A = (A-1) % NUM_LEDS
+#define CYCLE_LED(A) A = (A+1) % NUM_LEDS  // forward
+#define REVERSE_CYCLE_LED(A) A = (A-1) % NUM_LEDS  //backward
 
 //------------VARIABLES--------------//
 
@@ -53,6 +87,7 @@ unsigned int numFiles; // Total number of files on media (autodetected in setup(
 byte mediaType;        // Media type (autodetected in setup())
 //*/
 
+//SSID et IP du Broker MQTT à indiquer dans fichier WifiConfig.h
 char ssid[] = WIFI_SSID;
 char password[] = WIFI_PASSWORD;
 IPAddress mon_broker(BROKER_IP);
@@ -71,7 +106,7 @@ String topicName = clientID + "/#";//Topic individuel nominatif pour publier un 
 uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
-bool global_enabled = false; //ne pas afficher d'animation tant que pas de messages reçu en MQTT
+bool global_enabled = false; //ne pas lancer de patterns dans le ledstrip tant que pas de messages reçu en MQTT
 
 //-------------FONCTION WIFI : connexion, IP -------------
 void setup_wifi() {
@@ -110,7 +145,7 @@ void connect_mqtt()
   client.subscribe("holdstate");
   client.subscribe(topicName.c_str());
 
-  client.publish("welcome", clientID.c_str());
+  client.publish("welcome", clientID.c_str()); // publie son nom sur le topic welcome lors de la connexion
   Serial.printf("topic welcome : %s\n", clientID.c_str());
 }
 
@@ -267,13 +302,14 @@ void p13() {
 
 /////////////////////////////////////////////////////////
 
+//function "macro" pour traiter le message MQTT arrivant au MC et retourner la partie utile : un entier
 int payloadToInt(byte* payload, int length){
   String payloadFromMQTT = "";
   for (int i = 0; i < length; i++) { //itérer dans toute la longueur message, length est fourni dans le callback MQTT
     if (isDigit(payload[i]))// tester si le payload est bien un chiffre décimal
-      payloadFromMQTT += (char)payload[i];//caster en type char
+      payloadFromMQTT += (char)payload[i];//caster en type char et ajouter/placer dans la variable
   }
-  return payloadFromMQTT.toInt();//transformer la String en entier et renvoyer la conversion en integer
+  return payloadFromMQTT.toInt();//convertir le String en entier et retourner la valeur
 }
 
 //-------------FONCTION CALLBACK------------
@@ -282,35 +318,44 @@ int payloadToInt(byte* payload, int length){
 void callback(char* topic, byte* payload, unsigned int length)
 {
   String debugMessage = "";
-  global_enabled = true;
+  global_enabled = true; // open flag : PLAY !
+  
   //Affichage dans le moniteur (topic welcome) du -t topic et du - m message
   debugMessage = clientID + " - Topic entrant : [" + topic + "] ";
 
   //On identifie le topic que l'on veut traiter grâce à strcmp() pour "String Compare" : strcmp retourne un 0 si les deux string sont équivalentes
   //référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
 
-  //-----durée en secondes pour tous les clients ou ce client, exemple 10 secondes : mosquitto_pub -t holdstate -m 10
-  if ( (strcmp(topic, (clientID + "/holdstate").c_str()) == 0)
-       || (strcmp(topic, "holdstate") == 0)) {
+
+  //----------- durée en secondes à jouer un pattern ----------------
+  //exemple de publication pour un pattern d'une durée de 10 secondes : mosquitto_pub -t holdstate -m 10
+  if ( (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) //pour ce client uniquement
+       || (strcmp(topic, "holdstate") == 0)) { //pour tous les clients
     holdPattern = payloadToInt(payload,length);
     debugMessage += holdPattern;
   }
 
   //------appel d'un ledAudioPattern de lumière+sons pour tous les clients ou ce client -----
-  if ( (strcmp(topic, (clientID + "/ledstate").c_str()) == 0)
-       || (strcmp(topic, "ledstate") == 0)) {
+  //exemple de publication pour appeler le pattern 1 càd la function p1() pour ce client spécifiquement : 
+  if ( (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/ledstate -m 1
+       || (strcmp(topic, "ledstate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
     ledAudioPattern = payloadToInt(payload,length);
     debugMessage += ledAudioPattern;
   }
 
   //-----Si le topic est modestate :
-  //0 = enchainement de tout le tableau gPatterns en restant sur chaque pattern holdPattern secondes et 1 = jouer uniquement le pattern ledAudioPattern
+  //0 = enchainement de tout le tableau gPatterns en restant sur chaque pattern holdPattern secondes 
+  //1 = jouer uniquement le pattern ledAudioPattern pendant holdPattern secondes 
   if (strcmp(topic, "modestate") == 0) {
     modePattern = payloadToInt(payload,length);
     debugMessage += modePattern;
   }
 
-  client.publish("welcome", debugMessage.c_str());
+//---------- Pour visualiser le traffic arrivant aux ESP ----------------
+    // durées : mosquitto_sub -t welcome/holdPattern ou mosquitto_sub -t welcome/holdPattern
+    // patterns: mosquitto_sub -t welcome/ledAudioPattern
+    // mode d'enchainement : // mosquitto_sub -t welcome/modePattern
+  client.publish("welcome", debugMessage.c_str()); 
 }
 
 //////////////////////////////////////////////////////////////
@@ -338,6 +383,11 @@ void setPattern() {
   }
 }
 
+
+
+
+//----------------------------------------SETUP--------------------------------------
+
 void setup() {
   Serial.begin(115200);
   delay(10);
@@ -353,14 +403,14 @@ void setup() {
   //SoftwareSerial.h en fait un port série virtuel, pas une sortie data classique !!
   ///////////////////////////////////////////////////////////////////////
 
-  //////////////////// JQ6500 settings ////////////////////
+ ///////////// JQ6500 settings ///////////
   mp3.begin(9600,3,2);
   mp3.reset();
   mp3.setVolume(40);
   mp3.setLoopMode(MP3_LOOP_NONE);
   mp3.setEqualizer(MP3_EQ_NORMAL);
   mp3.setSource(MP3_SRC_BUILTIN);
-  //////////////////////////////////////
+  ///////////////////////////////////////
 
   setup_wifi();
 
@@ -371,8 +421,8 @@ void setup() {
   //https://pubsubclient.knolleary.net/api.html#callback
   client.setCallback(callback);
 
-  LEDS.addLeds<WS2812B, LEDSTRIP, GRB>(leds, NUM_LEDS);//GRB et non RGB car le rouge et le vert sont inversés pour les WS2813B
-  LEDS.setBrightness(BRIGHTNESS);// (255) = puissance maximale -----> ATTENTION POWER !
+  FastLED.addLeds<STRIPMODEL, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);// set master brightness control.
+  FastLED.setBrightness(BRIGHTNESS);// (255) = puissance maximale -----> ATTENTION POWER !
 
   //indique dans le moniteur le nombre de fonctions à disposition
   Serial.print("le nombre de fonctions diponibles est :");
@@ -387,11 +437,16 @@ void setup() {
 }
 
 
+
+
+
+//---------------------------------------- --------------------------------------
+
 void nextPattern()
-{ // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern courant stocké dans ledstate
-  //mosquitto_pub -t modestate -m 0
+{ // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern appelé
+  //exemple: mosquitto_pub -t modestate -m 0
   if (modePattern = 0) {
-    // add one to the current pattern number, and wrap around at the end
+    // enchainer = add one to the current pattern number, and wrap around at the end
     gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
   }
 }
