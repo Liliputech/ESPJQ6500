@@ -36,7 +36,7 @@
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include <JQ6500_Serial.h>
-#include <WifiConfig.h>
+#include "WifiConfig.h"
 
 //MQTT LIBS
 #include <PubSubClient.h>//https://pubsubclient.knolleary.net/api.html
