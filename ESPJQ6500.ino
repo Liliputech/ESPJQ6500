@@ -424,11 +424,13 @@ void setup() {
   FastLED.addLeds<STRIPMODEL, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);// set master brightness control.
   FastLED.setBrightness(BRIGHTNESS);// (255) = puissance maximale -----> ATTENTION POWER !
 
-  //indique dans le moniteur le nombre de fonctions à disposition
+  /*A REVOIR
+  indique dans le moniteur le nombre de fonctions à disposition
   Serial.print("le nombre de fonctions diponibles est :");
-  Serial.println(nFunc);
+  Serial.println(nFunc); // ?
   Serial.println();
-
+ */
+ 
   //OTA Update setup
   MDNS.begin(clientID);
   httpUpdater.setup(&httpServer);
