@@ -72,8 +72,8 @@ ESP8266HTTPUpdateServer httpUpdater;
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
 //Helper macro to cycle through the leds
-#define CYCLE_LED(A) A = (A+1) % NUM_LEDS  // forward
-#define REVERSE_CYCLE_LED(A) A = (A-1) % NUM_LEDS  //backward
+#define CYCLE_LED(A) ((A) = ((A)+1) % NUM_LEDS)  // forward
+#define REVERSE_CYCLE_LED(A) ((A) = ((A)-1) % NUM_LEDS)  //backward
 
 //------------VARIABLES--------------//
 
@@ -96,7 +96,6 @@ WiFiClient ESP01client;
 PubSubClient client(ESP01client);
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
-byte ledAudioPattern = 0; // pattern # : 255 patterns maximum
 byte holdPattern = 10; // nombre de secondes à jouer le ledAudioPattern courant
 byte modePattern = 0; //mode d'enchainement des patterns : 0 = enchainer
 
@@ -110,7 +109,6 @@ bool global_enabled = false; //ne pas lancer de patterns dans le ledstrip tant q
 
 //-------------FONCTION WIFI : connexion, IP -------------
 void setup_wifi() {
-  delay(10);
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Connecting to ");
@@ -161,7 +159,6 @@ void addGlitter( fract8 chanceOfGlitter)
 void p0() {
   static int i = 0;
   fadeToBlackBy(leds, NUM_LEDS, 0);//https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
-  delay(5);
   CYCLE_LED(i);
 }
 
@@ -173,7 +170,6 @@ void p1()
   static int i = 0;
   // Set the i'th led to red
   leds[i] = CHSV(hue++, 255, 255);
-  delay(30);
   CYCLE_LED(i);
 }
 
@@ -183,7 +179,6 @@ void p2()
   static int i = NUM_LEDS;
   // Set the i'th led to red
   leds[i] = CHSV(hue++, 255, 255);
-  delay(30);
   REVERSE_CYCLE_LED(i);
 }
 
@@ -195,7 +190,6 @@ void p3()
   static int i = 0;
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  delay(5);
   CYCLE_LED(i);
 }
 
@@ -205,7 +199,6 @@ void p4()
   static int i = NUM_LEDS;
   if ( i < NUM_LEDS) leds[i + 1] = CRGB::Black;
   leds[i] = CRGB::Blue;
-  delay(5);
   REVERSE_CYCLE_LED(i);
 }
 
@@ -217,20 +210,18 @@ void p5() {
   for ( int i = 0; i < 8; i++) {
     leds[beatsin16( i + 7, 0, NUM_LEDS - 1 )] |= CHSV(dothue, 200, 255);
     dothue += 32;
-    delay(20);
   }
 }
 
 //---------DemoReel100: bpm--------
 void p6() {
   // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
-  static int i=0;
   uint8_t BeatsPerMinute = 62;
   CRGBPalette16 palette = PartyColors_p;
   uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
-  leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
-  delay(20);
-  CYCLE_LED(i);
+  for( int i = 0; i < NUM_LEDS; i++) { //9948
+    leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
+  }
 }
 
 //---------DemoReel100: sinelon--------
@@ -240,7 +231,6 @@ void p7()
   fadeToBlackBy( leds, NUM_LEDS, 20);
   int pos = beatsin16( 13, 0, NUM_LEDS - 1 );
   leds[pos] += CHSV( gHue, 255, 192);
-  delay(20);
 }
 
 //---------DemoReel100: confetti--------
@@ -250,7 +240,6 @@ void p8()
   fadeToBlackBy( leds, NUM_LEDS, 10);
   int pos = random16(NUM_LEDS);
   leds[pos] += CHSV( gHue + random8(64), 200, 255);
-  delay(20);
 }
 
 //---------DemoReel100: rainbow--------
@@ -258,7 +247,6 @@ void p9()
 {
   // FastLED's built-in rainbow generator
   fill_rainbow( leds, NUM_LEDS, gHue, 7);
-  delay(20);
 }
 
 //---------DemoReel100: rainbowWithGlitter--------
@@ -267,7 +255,6 @@ void p10()
   // built-in FastLED rainbow, plus some random sparkly glitter
   p9();
   addGlitter(80);
-  delay(20);
 }
 
 
@@ -277,7 +264,6 @@ void p11() {
   static int i = 0;
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  delay(5);
   CYCLE_LED(i);
 }
 //TEST BLEU
@@ -286,7 +272,6 @@ void p12() {
   static int i = 0;
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  delay(5);
   CYCLE_LED(i);
 }
 
@@ -296,11 +281,26 @@ void p13() {
   static int i = 0;
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  delay(5);
   CYCLE_LED(i);
 }
 
 /////////////////////////////////////////////////////////
+
+//----- Correspondance MQTT Pattern -> Leds Fonctions---------
+//------------------------REF----------------------------------
+//array of function pointers
+//https://www.geeksforgeeks.org/how-to-declare-a-pointer-to-a-function/
+//https://www.geeksforgeeks.org/function-pointer-in-c/
+
+//------ array de pointeurs vers des fonctions ------
+//https://forum.arduino.cc/index.php?topic=610508.0
+//l'idée est de faire pointer la variable ledAudioPattern, vers la fonction respective
+//exemple:  ledstate = 1 -> appel de p1()
+
+// List of patterns to cycle through.  Each is defined as a separate function below.
+typedef void (*SimplePatternList[])();
+SimplePatternList gPatterns = { p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 };
+
 
 //function "macro" pour traiter le message MQTT arrivant au MC et retourner la partie utile : un entier
 int payloadToInt(byte* payload, int length){
@@ -312,12 +312,23 @@ int payloadToInt(byte* payload, int length){
   return payloadFromMQTT.toInt();//convertir le String en entier et retourner la valeur
 }
 
+
+void setPattern(int ledAudioPattern) {
+  if ((ledAudioPattern >= 0) && (ledAudioPattern < ARRAY_SIZE(gPatterns)))
+  {
+    gCurrentPatternNumber = ledAudioPattern;
+  }
+}
+
+
 //-------------FONCTION CALLBACK------------
 //l'étoile * means a pointer to the given type. Explained in chapter 1 of any C book
 //https://stackoverflow.com/questions/55637077/looking-for-explanation-about-simple-function-declaration
 void callback(char* topic, byte* payload, unsigned int length)
 {
   String debugMessage = "";
+  int ledAudioPattern = 0;
+
   global_enabled = true; // open flag : PLAY !
   
   //Affichage dans le moniteur (topic welcome) du -t topic et du - m message
@@ -340,6 +351,7 @@ void callback(char* topic, byte* payload, unsigned int length)
   if ( (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/ledstate -m 1
        || (strcmp(topic, "ledstate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
     ledAudioPattern = payloadToInt(payload,length);
+    setPattern(ledAudioPattern);
     debugMessage += ledAudioPattern;
   }
 
@@ -361,36 +373,10 @@ void callback(char* topic, byte* payload, unsigned int length)
 //////////////////////////////////////////////////////////////
 
 
-//----- Correspondance MQTT Pattern -> Leds Fonctions---------
-//------------------------REF----------------------------------
-//array of function pointers
-//https://www.geeksforgeeks.org/how-to-declare-a-pointer-to-a-function/
-//https://www.geeksforgeeks.org/function-pointer-in-c/
-
-//------ array de pointeurs vers des fonctions ------
-//https://forum.arduino.cc/index.php?topic=610508.0
-//l'idée est de faire pointer la variable ledAudioPattern, vers la fonction respective
-//exemple:  ledstate = 1 -> appel de p1()
-
-// List of patterns to cycle through.  Each is defined as a separate function below.
-typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = { p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 };
-
-void setPattern() {
-  if ((ledAudioPattern >= 0) && (ledAudioPattern < ARRAY_SIZE(gPatterns)))
-  {
-    gCurrentPatternNumber = ledAudioPattern;
-  }
-}
-
-
-
-
 //----------------------------------------SETUP--------------------------------------
 
 void setup() {
   Serial.begin(115200);
-  delay(10);
 
   //////////// ESP01 settings //////////
   //********************* CHANGE ESP01 PIN FUNCTION **************************************
@@ -438,10 +424,6 @@ void setup() {
   MDNS.addService("http", "tcp", 80);
 }
 
-
-
-
-
 //---------------------------------------- --------------------------------------
 
 void nextPattern()
@@ -475,7 +457,7 @@ void loop() {
   //----------------- JQ6500 ------------------//
   if (mp3.getStatus() != MP3_STATUS_PLAYING)
   {
-    mp3.playFileByIndexNumber(ledAudioPattern);
+    mp3.playFileByIndexNumber(gCurrentPatternNumber);
     mp3.play();
   }
 
