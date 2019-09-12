@@ -72,8 +72,8 @@ ESP8266HTTPUpdateServer httpUpdater;
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
 //Helper macro to cycle through the leds
-#define CYCLE_LED(A) A = (A+1) % NUM_LEDS  // forward
-#define REVERSE_CYCLE_LED(A) A = (A-1) % NUM_LEDS  //backward
+#define CYCLE_LED(A) ((A) = ((A)+1) % NUM_LEDS)  // forward
+#define REVERSE_CYCLE_LED(A) ((A) = ((A)-1) % NUM_LEDS)  //backward
 
 //------------VARIABLES--------------//
 
@@ -96,7 +96,6 @@ WiFiClient ESP01client;
 PubSubClient client(ESP01client);
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
-byte ledAudioPattern = 0; // pattern # : 255 patterns maximum
 byte holdPattern = 10; // nombre de secondes à jouer le ledAudioPattern courant
 byte modePattern = 0; //mode d'enchainement des patterns : 0 = enchainer
 
@@ -302,6 +301,22 @@ void p13() {
 
 /////////////////////////////////////////////////////////
 
+//----- Correspondance MQTT Pattern -> Leds Fonctions---------
+//------------------------REF----------------------------------
+//array of function pointers
+//https://www.geeksforgeeks.org/how-to-declare-a-pointer-to-a-function/
+//https://www.geeksforgeeks.org/function-pointer-in-c/
+
+//------ array de pointeurs vers des fonctions ------
+//https://forum.arduino.cc/index.php?topic=610508.0
+//l'idée est de faire pointer la variable ledAudioPattern, vers la fonction respective
+//exemple:  ledstate = 1 -> appel de p1()
+
+// List of patterns to cycle through.  Each is defined as a separate function below.
+typedef void (*SimplePatternList[])();
+SimplePatternList gPatterns = { p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 };
+
+
 //function "macro" pour traiter le message MQTT arrivant au MC et retourner la partie utile : un entier
 int payloadToInt(byte* payload, int length){
   String payloadFromMQTT = "";
@@ -312,12 +327,23 @@ int payloadToInt(byte* payload, int length){
   return payloadFromMQTT.toInt();//convertir le String en entier et retourner la valeur
 }
 
+
+void setPattern(int ledAudioPattern) {
+  if ((ledAudioPattern >= 0) && (ledAudioPattern < ARRAY_SIZE(gPatterns)))
+  {
+    gCurrentPatternNumber = ledAudioPattern;
+  }
+}
+
+
 //-------------FONCTION CALLBACK------------
 //l'étoile * means a pointer to the given type. Explained in chapter 1 of any C book
 //https://stackoverflow.com/questions/55637077/looking-for-explanation-about-simple-function-declaration
 void callback(char* topic, byte* payload, unsigned int length)
 {
   String debugMessage = "";
+  int ledAudioPattern = 0;
+
   global_enabled = true; // open flag : PLAY !
   
   //Affichage dans le moniteur (topic welcome) du -t topic et du - m message
@@ -340,6 +366,7 @@ void callback(char* topic, byte* payload, unsigned int length)
   if ( (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/ledstate -m 1
        || (strcmp(topic, "ledstate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
     ledAudioPattern = payloadToInt(payload,length);
+    setPattern(ledAudioPattern);
     debugMessage += ledAudioPattern;
   }
 
@@ -359,31 +386,6 @@ void callback(char* topic, byte* payload, unsigned int length)
 }
 
 //////////////////////////////////////////////////////////////
-
-
-//----- Correspondance MQTT Pattern -> Leds Fonctions---------
-//------------------------REF----------------------------------
-//array of function pointers
-//https://www.geeksforgeeks.org/how-to-declare-a-pointer-to-a-function/
-//https://www.geeksforgeeks.org/function-pointer-in-c/
-
-//------ array de pointeurs vers des fonctions ------
-//https://forum.arduino.cc/index.php?topic=610508.0
-//l'idée est de faire pointer la variable ledAudioPattern, vers la fonction respective
-//exemple:  ledstate = 1 -> appel de p1()
-
-// List of patterns to cycle through.  Each is defined as a separate function below.
-typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = { p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 };
-
-void setPattern() {
-  if ((ledAudioPattern >= 0) && (ledAudioPattern < ARRAY_SIZE(gPatterns)))
-  {
-    gCurrentPatternNumber = ledAudioPattern;
-  }
-}
-
-
 
 
 //----------------------------------------SETUP--------------------------------------
@@ -475,7 +477,7 @@ void loop() {
   //----------------- JQ6500 ------------------//
   if (mp3.getStatus() != MP3_STATUS_PLAYING)
   {
-    mp3.playFileByIndexNumber(ledAudioPattern);
+    mp3.playFileByIndexNumber(gCurrentPatternNumber);
     mp3.play();
   }
 
