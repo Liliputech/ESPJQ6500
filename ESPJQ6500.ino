@@ -109,7 +109,6 @@ bool global_enabled = false; //ne pas lancer de patterns dans le ledstrip tant q
 
 //-------------FONCTION WIFI : connexion, IP -------------
 void setup_wifi() {
-  delay(10);
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Connecting to ");
@@ -160,7 +159,6 @@ void addGlitter( fract8 chanceOfGlitter)
 void p0() {
   static int i = 0;
   fadeToBlackBy(leds, NUM_LEDS, 0);//https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
-  delay(5);
   CYCLE_LED(i);
 }
 
@@ -172,7 +170,6 @@ void p1()
   static int i = 0;
   // Set the i'th led to red
   leds[i] = CHSV(hue++, 255, 255);
-  delay(30);
   CYCLE_LED(i);
 }
 
@@ -182,7 +179,6 @@ void p2()
   static int i = NUM_LEDS;
   // Set the i'th led to red
   leds[i] = CHSV(hue++, 255, 255);
-  delay(30);
   REVERSE_CYCLE_LED(i);
 }
 
@@ -194,7 +190,6 @@ void p3()
   static int i = 0;
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  delay(5);
   CYCLE_LED(i);
 }
 
@@ -204,7 +199,6 @@ void p4()
   static int i = NUM_LEDS;
   if ( i < NUM_LEDS) leds[i + 1] = CRGB::Black;
   leds[i] = CRGB::Blue;
-  delay(5);
   REVERSE_CYCLE_LED(i);
 }
 
@@ -216,20 +210,18 @@ void p5() {
   for ( int i = 0; i < 8; i++) {
     leds[beatsin16( i + 7, 0, NUM_LEDS - 1 )] |= CHSV(dothue, 200, 255);
     dothue += 32;
-    delay(20);
   }
 }
 
 //---------DemoReel100: bpm--------
 void p6() {
   // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
-  static int i=0;
   uint8_t BeatsPerMinute = 62;
   CRGBPalette16 palette = PartyColors_p;
   uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
-  leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
-  delay(20);
-  CYCLE_LED(i);
+  for( int i = 0; i < NUM_LEDS; i++) { //9948
+    leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
+  }
 }
 
 //---------DemoReel100: sinelon--------
@@ -239,7 +231,6 @@ void p7()
   fadeToBlackBy( leds, NUM_LEDS, 20);
   int pos = beatsin16( 13, 0, NUM_LEDS - 1 );
   leds[pos] += CHSV( gHue, 255, 192);
-  delay(20);
 }
 
 //---------DemoReel100: confetti--------
@@ -249,7 +240,6 @@ void p8()
   fadeToBlackBy( leds, NUM_LEDS, 10);
   int pos = random16(NUM_LEDS);
   leds[pos] += CHSV( gHue + random8(64), 200, 255);
-  delay(20);
 }
 
 //---------DemoReel100: rainbow--------
@@ -257,7 +247,6 @@ void p9()
 {
   // FastLED's built-in rainbow generator
   fill_rainbow( leds, NUM_LEDS, gHue, 7);
-  delay(20);
 }
 
 //---------DemoReel100: rainbowWithGlitter--------
@@ -266,7 +255,6 @@ void p10()
   // built-in FastLED rainbow, plus some random sparkly glitter
   p9();
   addGlitter(80);
-  delay(20);
 }
 
 
@@ -276,7 +264,6 @@ void p11() {
   static int i = 0;
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  delay(5);
   CYCLE_LED(i);
 }
 //TEST BLEU
@@ -285,7 +272,6 @@ void p12() {
   static int i = 0;
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  delay(5);
   CYCLE_LED(i);
 }
 
@@ -295,7 +281,6 @@ void p13() {
   static int i = 0;
   if ( i > 0) leds[i - 1] = CRGB::Black;
   leds[i] = CRGB::Red;
-  delay(5);
   CYCLE_LED(i);
 }
 
@@ -392,7 +377,6 @@ void callback(char* topic, byte* payload, unsigned int length)
 
 void setup() {
   Serial.begin(115200);
-  delay(10);
 
   //////////// ESP01 settings //////////
   //********************* CHANGE ESP01 PIN FUNCTION **************************************
@@ -439,10 +423,6 @@ void setup() {
   httpServer.begin();
   MDNS.addService("http", "tcp", 80);
 }
-
-
-
-
 
 //---------------------------------------- --------------------------------------
 
