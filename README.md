@@ -32,4 +32,4 @@ exemple:
 
 -----
 
-
+UPLOAD VIA FTDI232 works fine however a similar chip named YP-05 gives back nothing in Arduino monitor
