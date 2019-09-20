@@ -1,35 +1,14 @@
-/*
- * FastLED DOCS
- * demoReel100 getstarted https://www.reddit.com/r/FastLED/comments/b2ceka/new_to_fastled_and_trying_to_understand_examples/
- * Overview https://github.com/FastLED/FastLED/wiki/Overview 
- * 
- * FastLED's builtin functions https://github.com/FastLED/FastLED/blob/master/lib8tion.h
- * 
- * 1) fadeToBlack()
- * Each time fadeToBlack is called it is dimming whatever current values a pixel has. 
- * Again, because these functions are being called continuosly from each time through the programs main (void) loop, 
- * pixels will keep getting darker and darker until they go to black or are assigned new values.
- * fadeToBlackBy( leds, NUM_LEDS, 20); 
- * This operates on the "leds" array, fading all pixels in this case 
- * (since NUM_LEDS is specified, vs something less then NUM_LEDS), 
- * and it fades by an amount of 20/256th, or about 7.8%.
- * 
- * 
- * 2) beatsin16() 
- * It takes the arguments beats/minute, a low value, and high value (and optionally also a time base and phase offset). 
- * So in this case:
- * int pos = beatsin16( 13, 0, NUM_LEDS-1 );
- * is setup to do 13 BPM, cycling from 0 to NUM_LEDS-1 (ie from the first pixel to the last pixel in the strip). 
- * That resulting pos number becomes the pixel position, leds[pos], when assigning color.
+/* appeler le son n°17
+      mosquitto_pub -t audiostate -m 17
 
- * 3) random() : nombreuse fonction random décrites dans lib8tion.h (lien plus haut)
- * random16( n)    == random from 0..(N-1)
- * random8()       == random from 0..255
- * 
+  régler le volume sur 60
+      mosquitto_pub -t volstate -m 60
+
+  mettre le fichier son en boucle    (0 = pas de boucle, 1 = en boucle)
+      mosquitto_pub -t loopstate -m 1
+
 */
 
- 
- 
 //------Bibliothèques et Settings------
 
 //AUDIO LIBS
@@ -42,76 +21,34 @@
 #include <PubSubClient.h>//https://pubsubclient.knolleary.net/api.html
 #include <ESP8266WiFi.h>//https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/station-class.html
 
-//For OTA Update
-#include <ESP8266mDNS.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266HTTPUpdateServer.h>
-
-ESP8266WebServer httpServer(80);
-ESP8266HTTPUpdateServer httpUpdater;
-
-/*
-//LEDSTRIPS LIBS
-//4 lignes nécessaires pour éviter un flash intempestif récurrent...
-// -- The core to run FastLED.show()
-#define FASTLED_ALLOW_INTERRUPTS 0
-#include <FastLED.h>
-
-
-//LEDSTRIPS SETTINGS
-#define FASTLED_USING_NAMESPACE
-#define FASTLED_SHOW_CORE 0
-#define NUM_LEDS 30 // 5 mètres de WS2813B en 60 leds/mètre
-#define DATA_PIN 0 // ledstrip connecté au GPIO 0 de l'ESP01
-#define BRIGHTNESS  30
-#define FRAMES_PER_SECOND  120
-#define COLOR_ORDER GRB //GRB et non RGB car le rouge et le vert sont inversés pour les WS2813B
-#define STRIPMODEL WS2812B
-*/
-
-/*
-//sizeof : https://www.arduino.cc/reference/en/language/variables/utilities/sizeof/
-//determine la taille de l'array automatiquement, pour éviter de casser le code si on ajoute des fonctions.
-#define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
-
-//Helper macro to cycle through the leds
-#define CYCLE_LED(A) ((A) = ((A)+1) % NUM_LEDS)  // forward
-#define REVERSE_CYCLE_LED(A) ((A) = ((A)-1) % NUM_LEDS)  //backward
-*/
 
 //------------VARIABLES--------------//
-/*
-CRGB leds[NUM_LEDS];// Define the array of leds
-static uint8_t hue = 0;//hue variable
-*/
 JQ6500_Serial mp3; //les deux GPIO sont utilisés par la lib. SoftwareSerial comme ports série virtuels
 /*
-unsigned int audiofile; // numéro du fichier audio à lire
-unsigned int numFiles; // Total number of files on media (autodetected in setup())
-byte mediaType;        // Media type (autodetected in setup())
-//*/
+  unsigned int audiofile; // numéro du fichier audio à lire
+  unsigned int numFiles; // Total number of files on media (autodetected in setup())
+  byte mediaType;        // Media type (autodetected in setup())
+  //*/
 
 //SSID et IP du Broker MQTT à indiquer dans fichier WifiConfig.h
 char ssid[] = "Vishnu";//WIFI_SSID;
 char password[] = "BrahmaParticules";//WIFI_PASSWORD;
-IPAddress mon_broker(192,168,0,16);//(BROKER_IP);
+IPAddress mon_broker(192, 168, 0, 12); //(BROKER_IP);
 
 WiFiClient ESP01client;
 PubSubClient client(ESP01client);
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
 //byte holdPattern = 10; // nombre de secondes à jouer le ledAudioPattern courant
-byte modePattern = 0; //mode d'enchainement des patterns : 0 = enchainer
 byte audioPattern;//soundfile number
+byte volumePattern = 20;
+byte loopPattern = 1;// play soundfile loopPattern times, nombre de boucle, 0 = boucle infinie
+bool blocLoop = false; //avoid infinite loop()
 
 String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX. Je ne choisi pas ce nom il est dans l'ESP de base
 String topicName = clientID + "/#";//Topic individuel nominatif pour publier un message unique à un ESP unique
 
-/*
-uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
-uint8_t gHue = 0; // rotating "base color" used by many of the patterns
-*/
-bool global_enabled = false; //ne pas lancer de patterns dans le ledstrip tant que pas de messages reçu en MQTT
+bool global_enabled = false; //ne pas lancer de patterns tant que pas de messages reçu en MQTT
 
 //-------------FONCTION WIFI : connexion, IP -------------
 void setup_wifi() {
@@ -139,159 +76,22 @@ void connect_mqtt()
   // Loop until we're reconnected
   Serial.println("tentative de connexion au broker Mosquitto...");
   while (!client.connected()) {
-    if(client.connect(clientID.c_str()))
+    if (client.connect(clientID.c_str()))
       break;
     Serial.print('.');
     delay(10);
   }
 
- // client.subscribe("ledstate");
- //client.subscribe("holdstate");
- client.subscribe("audiostate");
- client.subscribe(topicName.c_str());
+  //client.subscribe("holdstate");
+  client.subscribe("audiostate");
+  client.subscribe("volstate");
+  client.subscribe("loopstate");
+  client.subscribe(topicName.c_str());
 
   client.publish("welcome", clientID.c_str()); // publie son nom sur le topic welcome lors de la connexion
   Serial.printf("topic welcome : %s\n", clientID.c_str());
 }
-/*
-//---------DemoReel100: addGlitter--------
-void addGlitter( fract8 chanceOfGlitter)
-{
-  if ( random8() < chanceOfGlitter) {
-    leds[ random16(NUM_LEDS) ] += CRGB::White;
-  }
-}
 
-//-------FADE OUT--------
-void p0() {
-  static int i = 0;
-  fadeToBlackBy(leds, NUM_LEDS, 0);//https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
-  CYCLE_LED(i);
-}
-
-//--------FONCTION DE BOUCLAGE DES PATTERNS-------
-//////////////////////////////////// PATTERNS p1() à p10() ///////////////////////////////////////
-//-------allumage successif maintenu en avant--------
-void p1()
-{
-  static int i = 0;
-  // Set the i'th led to red
-  leds[i] = CHSV(hue++, 255, 255);
-  CYCLE_LED(i);
-}
-
-//---------allumage successif maintenu en arrière--------
-void p2()
-{
-  static int i = NUM_LEDS;
-  // Set the i'th led to red
-  leds[i] = CHSV(hue++, 255, 255);
-  REVERSE_CYCLE_LED(i);
-}
-
-//---------Path-drik.ino : allumage successif non maintenu en avant--------
-//https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
-void p3()
-{
-  // First slide the led in one direction
-  static int i = 0;
-  if ( i > 0) leds[i - 1] = CRGB::Black;
-  leds[i] = CRGB::Red;
-  CYCLE_LED(i);
-}
-
-//---------Path-drik.ino : allumage non maintenu en arrière--------
-void p4()
-{
-  static int i = NUM_LEDS;
-  if ( i < NUM_LEDS) leds[i + 1] = CRGB::Black;
-  leds[i] = CRGB::Blue;
-  REVERSE_CYCLE_LED(i);
-}
-
-//--------- DemoReel100: juggle--------
-void p5() {
-  // eight colored dots, weaving in and out of sync with each other
-  fadeToBlackBy( leds, NUM_LEDS, 20);
-  byte dothue = 0;
-  for ( int i = 0; i < 8; i++) {
-    leds[beatsin16( i + 7, 0, NUM_LEDS - 1 )] |= CHSV(dothue, 200, 255);
-    dothue += 32;
-  }
-}
-
-//---------DemoReel100: bpm--------
-void p6() {
-  // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
-  uint8_t BeatsPerMinute = 62;
-  CRGBPalette16 palette = PartyColors_p;
-  uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
-  for( int i = 0; i < NUM_LEDS; i++) { //9948
-    leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
-  }
-}
-
-//---------DemoReel100: sinelon--------
-void p7()
-{
-  // a colored dot sweeping back and forth, with fading trails
-  fadeToBlackBy( leds, NUM_LEDS, 20);
-  int pos = beatsin16( 13, 0, NUM_LEDS - 1 );
-  leds[pos] += CHSV( gHue, 255, 192);
-}
-
-//---------DemoReel100: confetti--------
-void p8()
-{
-  // random colored speckles that blink in and fade smoothly
-  fadeToBlackBy( leds, NUM_LEDS, 10);
-  int pos = random16(NUM_LEDS);
-  leds[pos] += CHSV( gHue + random8(64), 200, 255);
-}
-
-//---------DemoReel100: rainbow--------
-void p9()
-{
-  // FastLED's built-in rainbow generator
-  fill_rainbow( leds, NUM_LEDS, gHue, 7);
-}
-
-//---------DemoReel100: rainbowWithGlitter--------
-void p10()
-{
-  // built-in FastLED rainbow, plus some random sparkly glitter
-  p9();
-  addGlitter(80);
-}
-
-
-//TEST ROUGE
-void p11() {
-   // First slide the led in one direction
-  static int i = 0;
-  if ( i > 0) leds[i - 1] = CRGB::Black;
-  leds[i] = CRGB::Red;
-  CYCLE_LED(i);
-}
-//TEST BLEU
-void p12() {
- // First slide the led in one direction
-  static int i = 0;
-  if ( i > 0) leds[i - 1] = CRGB::Black;
-  leds[i] = CRGB::Red;
-  CYCLE_LED(i);
-}
-
-//TEST VERT
-void p13() {
-   // First slide the led in one direction
-  static int i = 0;
-  if ( i > 0) leds[i - 1] = CRGB::Black;
-  leds[i] = CRGB::Red;
-  CYCLE_LED(i);
-}
-*/
-/////////////////////////////////////////////////////////
 
 //----- Correspondance MQTT Pattern -> Leds Fonctions---------
 //------------------------REF----------------------------------
@@ -304,14 +104,9 @@ void p13() {
 //l'idée est de faire pointer la variable ledAudioPattern, vers la fonction respective
 //exemple:  ledstate = 1 -> appel de p1()
 
-/*
-// List of patterns to cycle through.  Each is defined as a separate function below.
-typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = { p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 };
-*/
 
 //function "macro" pour traiter le message MQTT arrivant au MC et retourner la partie utile : un entier
-int payloadToInt(byte* payload, int length){
+int payloadToInt(byte* payload, int length) {
   String payloadFromMQTT = "";
   for (int i = 0; i < length; i++) { //itérer dans toute la longueur message, length est fourni dans le callback MQTT
     if (isDigit(payload[i]))// tester si le payload est bien un chiffre décimal
@@ -320,14 +115,6 @@ int payloadToInt(byte* payload, int length){
   return payloadFromMQTT.toInt();//convertir le String en entier et retourner la valeur
 }
 
-/*
-void setPattern(int ledAudioPattern) {
-  if ((ledAudioPattern >= 0) && (ledAudioPattern < ARRAY_SIZE(gPatterns)))
-  {
-    gCurrentPatternNumber = ledAudioPattern;
-  }
-}
-*/
 
 //-------------FONCTION CALLBACK------------
 //l'étoile * means a pointer to the given type. Explained in chapter 1 of any C book
@@ -335,56 +122,44 @@ void setPattern(int ledAudioPattern) {
 void callback(char* topic, byte* payload, unsigned int length)
 {
   String debugMessage = "";
-  //int ledAudioPattern = 0;
 
-  global_enabled = true; // open flag : PLAY !
-  
+  global_enabled = true; // open flag : permettre à tous les messages MQTT qui arrivent de mettre en marche loop() et donc d'être traités
+
   //Affichage dans le moniteur (topic welcome) du -t topic et du - m message
   debugMessage = clientID + " - Topic entrant : [" + topic + "] ";
 
   //On identifie le topic que l'on veut traiter grâce à strcmp() pour "String Compare" : strcmp retourne un 0 si les deux string sont équivalentes
   //référence de strcmp() : http://www.cplusplus.com/reference/cstring/strcmp/
 
-/*
-  //----------- durée en secondes à jouer un pattern ----------------
-  //exemple de publication pour un pattern d'une durée de 10 secondes : mosquitto_pub -t holdstate -m 10
-  if ( (strcmp(topic, (clientID + "/holdstate").c_str()) == 0) //pour ce client uniquement
-       || (strcmp(topic, "holdstate") == 0)) { //pour tous les clients
-    holdPattern = payloadToInt(payload,length);
-    debugMessage += holdPattern;
-  }
 
-  //------appel d'un ledAudioPattern de lumière+sons pour tous les clients ou ce client -----
-  //exemple de publication pour appeler le pattern 1 càd la function p1() pour ce client spécifiquement : 
-  if ( (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/ledstate -m 1
-       || (strcmp(topic, "ledstate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
-    ledAudioPattern = payloadToInt(payload,length);
-    setPattern(ledAudioPattern);
-    debugMessage += ledAudioPattern;
-  }
-
-  //-----Si le topic est modestate :
-  //0 = enchainement de tout le tableau gPatterns en restant sur chaque pattern holdPattern secondes 
-  //1 = jouer uniquement le pattern ledAudioPattern pendant holdPattern secondes 
-  if (strcmp(topic, "modestate") == 0) {
-    modePattern = payloadToInt(payload,length);
-    debugMessage += modePattern;
-  }
-*/
- //------appel d'un audioPattern de sons pour tous les clients ou ce client -----
-  //exemple de publication pour appeler le son N°1  pour ce client spécifiquement : 
+  //------appel d'un audioPattern de sons pour tous les clients ou ce client -----
+  //exemple de publication pour appeler le son N°1  pour ce client spécifiquement :
   if ( (strcmp(topic, (clientID + "/audiostate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/audiostate -m 1
        || (strcmp(topic, "audiostate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
-    audioPattern = payloadToInt(payload,length);
-    //setPattern(audioPattern);
+    audioPattern = payloadToInt(payload, length);
     debugMessage += audioPattern;
+    blocLoop = true; // soudfile PLAY open flag : permet au fichier son spécifiquement d'être traité dans loop()
   }
-  
-//---------- Pour visualiser le traffic arrivant aux ESP ----------------
-    // durées : mosquitto_sub -t welcome/holdPattern ou mosquitto_sub -t welcome/holdPattern
-    // patterns: mosquitto_sub -t welcome/ledAudioPattern
-    // mode d'enchainement : // mosquitto_sub -t welcome/modePattern
-  client.publish("welcome", debugMessage.c_str()); 
+
+  //MQTT VOLUME à un niveau de 30 : mosquitto_pub -t volstate -m 30
+  if ( (strcmp(topic, (clientID + "/volstate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/audiostate -m 1
+       || (strcmp(topic, "volstate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
+    volumePattern = payloadToInt(payload, length);
+    debugMessage += volumePattern;
+  }
+
+
+  if ( (strcmp(topic, (clientID + "/loopstate").c_str()) == 0)
+       || (strcmp(topic, "loopstate") == 0)) {
+    loopPattern = payloadToInt(payload, length);
+    debugMessage += loopPattern;
+  }
+
+  //---------- Pour visualiser le traffic arrivant aux ESP ----------------
+  // durées : mosquitto_sub -t welcome/holdPattern ou mosquitto_sub -t welcome/holdPattern
+  // patterns: mosquitto_sub -t welcome/ledAudioPattern
+  // mode d'enchainement : // mosquitto_sub -t welcome/modePattern
+  client.publish("welcome", debugMessage.c_str());
 }
 
 
@@ -396,27 +171,20 @@ void callback(char* topic, byte* payload, unsigned int length)
 void setup() {
   Serial.begin(74880);
 
-
-
   //////////// ESP01 settings //////////
   //********************* CHANGE ESP01 PIN FUNCTION **************************************
-  pinMode(3, FUNCTION_0); //(RX) pin (nommé également pin3 dans la doc) devient GPIO 3
+  pinMode(3, FUNCTION_0); //(RX) pin (nommé également pin3 dans la doc) est réinitialisé à son état normal au cas où ...
   //**************************************************************************************
-  //////////// ATTENTION ////////////////////////////////////////////////
-  //surtout pas configurer le GPIO3 en OUTPUT !!
-  //pinMode(3, OUTPUT);
-  //SoftwareSerial.h en fait un port série virtuel, pas une sortie data classique !!
-  ///////////////////////////////////////////////////////////////////////
- ///////////// JQ6500 settings ///////////
-  /*** CONNEXIONS ***
-*   ESP01 Pin 0 -> JQ6500 TX 
-*   ESP01 Pin 2 -> JQ6500 RX 
-*/
 
-  mp3.begin(9600,0,2);
+  ///////////// JQ6500 settings ///////////
+  /*** CONNEXIONS ***
+      ESP01 Pin 0 -> JQ6500 TX
+      ESP01 Pin 2 -> JQ6500 RX
+  */
+  mp3.begin(9600, 0, 2);
   mp3.reset();
-  mp3.setVolume(40);
-  mp3.setLoopMode(MP3_LOOP_NONE);
+  // mp3.setVolume(volumePattern);
+  // mp3.setLoopMode(MP3_LOOP_NONE);
   mp3.setEqualizer(MP3_EQ_NORMAL);
   mp3.setSource(MP3_SRC_BUILTIN);
   ///////////////////////////////////////
@@ -429,41 +197,21 @@ void setup() {
   //fonction qui permet de traiter -t -m
   //https://pubsubclient.knolleary.net/api.html#callback
   client.setCallback(callback);
-
-/*
-  FastLED.addLeds<STRIPMODEL, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);// set master brightness control.
-  FastLED.setBrightness(BRIGHTNESS);// (255) = puissance maximale -----> ATTENTION POWER !
-*/
-  /*A REVOIR
-  indique dans le moniteur le nombre de fonctions à disposition
-  Serial.print("le nombre de fonctions diponibles est :");
-  Serial.println(nFunc); // ?
-  Serial.println();
- */
- 
-  //OTA Update setup
-  MDNS.begin(clientID);
-  httpUpdater.setup(&httpServer);
-  httpServer.begin();
-  MDNS.addService("http", "tcp", 80);
+  //---------------------------------------- --------------------------------------
 }
 
-//---------------------------------------- --------------------------------------
 /*
-void nextPattern()
-{ // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern appelé
-  //exemple: mosquitto_pub -t modestate -m 0
-  if (modePattern = 0) {
-    // enchainer = add one to the current pattern number, and wrap around at the end
-    gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
+  void loopTrack() {
+  if (loopPattern = 0)  {
+    mp3.setLoopMode(MP3_LOOP_ONE_STOP);//(MP3_LOOP_NONE);//Play one track then stop
   }
-}
+  else  {
+    mp3.setLoopMode(MP3_LOOP_ONE);
+  }
+  }
 */
 
 void loop() {
-  //OTA Update Check
-  httpServer.handleClient();
-
   //if not connected to Wifi tries to connect
   if (WiFi.status() != WL_CONNECTED)
     setup_wifi();
@@ -478,29 +226,44 @@ void loop() {
   if (!global_enabled) //Global "display enable" flag
     return;
 
+  mp3.setVolume(volumePattern);
+  // loopTrack();
+  //mp3.setLoopMode(MP3_LOOP_ONE_STOP);//Default, plays track and stops // (MP3_LOOP_NONE)?
   //----------------- JQ6500 ------------------//
-  if (mp3.getStatus() != MP3_STATUS_PLAYING)
-  {
-    mp3.playFileByIndexNumber(audioPattern);//(gCurrentPatternNumber);
-    mp3.play();
-  }
 
-/*
-  // Call the current pattern function once, updating the 'leds' array
-  gPatterns[gCurrentPatternNumber]();
+  ////////////////////////////////////////////////////////////////////////////
+  /* NE MARCHE PAS : si 0 = loop infinie, sinon loopPattern fois
+    // blocloop = open flag : cette condition permet d'éviter que le fichier son ci-dessous ne continue indéfiniement dans loop()
+    if (blocLoop == true) {
+      if (loopPattern == 0) { //si la variable loopPattern est 0 on boucle perpétuellement le fichier
+        if (mp3.getStatus() != MP3_STATUS_PLAYING)
+        {
+          mp3.playFileByIndexNumber(audioPattern);
+          mp3.play();
+        }
+      }
 
-  // send the 'leds' array out to the actual LED strip
-  FastLED.show();
-  // insert a delay to keep the framerate modest
-  FastLED.delay(1000 / FRAMES_PER_SECOND);
-
-  // do some periodic updates
-  EVERY_N_MILLISECONDS( 20 ) {
-    gHue++;  // slowly cycle the "base color" through the rainbow
-  }
-
-  EVERY_N_SECONDS( holdPattern ) {
-    nextPattern();  // change patterns periodically
-  }
+      //BOUCLAGE "loopPattern" FOIS
+      else  { //patterns qui doivent se reproduire en nombre de bouclages définis par la variable loopPattern
+        for (int i = 0; i < loopPattern ; i++); {
+          if (mp3.getStatus() != MP3_STATUS_PLAYING)
+          {
+            mp3.playFileByIndexNumber(audioPattern);
+            mp3.play();
+          }
+        }
+        blocLoop = false;//close flag : la boucle ne continue pas plus que "loopPattern" fois
   */
+  ////////////////////////////////////////////////////////////////////////////
+  if (blocLoop == true) {
+
+    for (int i = 0; i < loopPattern ; i++); {
+      if (mp3.getStatus() != MP3_STATUS_PLAYING)
+      {
+        mp3.playFileByIndexNumber(audioPattern);
+        mp3.play();
+      }
+    }
+    blocLoop = false;//close flag : la boucle ne continue pas plus que "loopPattern" fois
+  }
 }
