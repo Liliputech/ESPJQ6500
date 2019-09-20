@@ -97,8 +97,9 @@ WiFiClient ESP01client;
 PubSubClient client(ESP01client);
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
-byte holdPattern = 1; // nombre de secondes à jouer le ledAudioPattern courant
-//byte modePattern = 1; //mode d'enchainement des ledAudioPattern : 0 = enchainer et 1 = jouer le ledAudioPattern courant (appelé via MQTT)
+byte holdPattern = 1; // nombre de secondes à jouer le ledPattern courant
+//byte modePattern = 1; //mode d'enchainement des ledPattern : 0 = enchainer et 1 = jouer le ledPattern courant (appelé via MQTT)
+byte audioPattern;//soundfile number
 
 String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX, il est dans l'ESP de base
 String topicName = clientID + "/#";//Topic individuel nominatif pour publier un message unique à un ESP unique
@@ -106,7 +107,7 @@ String topicName = clientID + "/#";//Topic individuel nominatif pour publier un 
 //uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
-bool global_enabled = false; //FLAG : ne pas lancer de ledAudioPattern tant que pas de messages reçu en MQTT
+bool global_enabled = false; //FLAG : ne pas lancer de ledPattern tant que pas de messages reçu en MQTT
 
 //-------------FONCTION WIFI : connexion, IP -------------
 void setup_wifi() {
@@ -296,7 +297,7 @@ void p13() {
 
 //------ array de pointeurs vers des fonctions ------
 //https://forum.arduino.cc/index.php?topic=610508.0
-//l'idée est de faire pointer la variable ledAudioPattern, vers la fonction respective
+//l'idée est de faire pointer la variable ledPattern, vers la fonction respective
 //exemple:  ledstate = 1 -> appel de p1()
 
 // List of patterns to cycle through.  Each is defined as a separate function below.
@@ -315,10 +316,10 @@ int payloadToInt(byte* payload, int length){
 }
 
 
-void setPattern(int ledAudioPattern) {
-  if ((ledAudioPattern >= 0) && (ledAudioPattern < ARRAY_SIZE(gPatterns)))
+void setPattern(int ledPattern) {
+  if ((ledPattern >= 0) && (ledPattern < ARRAY_SIZE(gPatterns)))
   {
-    gPatterns = ledAudioPattern;//gCurrentPatternNumber = ledAudioPattern;
+    gPatterns = ledPattern;//gCurrentPatternNumber = ledPattern;
   }
 }
 
@@ -329,7 +330,7 @@ void setPattern(int ledAudioPattern) {
 void callback(char* topic, byte* payload, unsigned int length)
 {
   String debugMessage = "";
-  int ledAudioPattern = 0;
+  int ledPattern = 0;
 
   global_enabled = true; // open flag : PLAY !
   
@@ -348,26 +349,37 @@ void callback(char* topic, byte* payload, unsigned int length)
     debugMessage += holdPattern;
   }
 
-  //------appel d'un ledAudioPattern de lumière+sons pour tous les clients ou ce client -----
+  //------appel d'un ledPattern de lumière pour tous les clients ou ce client -----
   //exemple de publication pour appeler le pattern 1 càd la function p1() pour ce client spécifiquement : 
   if ( (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/ledstate -m 1
        || (strcmp(topic, "ledstate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
-    ledAudioPattern = payloadToInt(payload,length);
-    setPattern(ledAudioPattern);
-    debugMessage += ledAudioPattern;
+    ledPattern = payloadToInt(payload,length);
+    setPattern(ledPattern);
+    debugMessage += ledPattern;
   }
 
+
+ //------appel d'un audioPattern sons pour tous les clients ou ce client -----
+  //exemple de publication pour appeler le pattern 1 càd la function p1() pour ce client spécifiquement : 
+  if ( (strcmp(topic, (clientID + "/audiostate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/ledstate -m 1
+       || (strcmp(topic, "audiostate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
+    audioPattern = payloadToInt(payload,length);
+    debugMessage += audioPattern;
+  }
+
+/*
   //-----Si le topic est modestate :
   //0 = enchainement de tout le tableau gPatterns en restant sur chaque pattern holdPattern secondes 
-  //1 = jouer uniquement le pattern ledAudioPattern pendant holdPattern secondes 
+  //1 = jouer uniquement le pattern ledPattern pendant holdPattern secondes 
   if (strcmp(topic, "modestate") == 0) {
     modePattern = payloadToInt(payload,length);
     debugMessage += modePattern;
   }
+  */
 
 //---------- Pour visualiser le traffic arrivant aux ESP ----------------
     // durées : mosquitto_sub -t welcome/holdPattern ou mosquitto_sub -t welcome/holdPattern
-    // patterns: mosquitto_sub -t welcome/ledAudioPattern
+    // patterns: mosquitto_sub -t welcome/ledPattern
     // mode d'enchainement : // mosquitto_sub -t welcome/modePattern
   client.publish("welcome", debugMessage.c_str()); 
 }
@@ -430,7 +442,7 @@ void setup() {
 //---------------------------------------- --------------------------------------
 /*
 void nextPattern()
-{ // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern appelé
+{ // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledPattern appelé
   //exemple: mosquitto_pub -t modestate -m 0
   if (modePattern = 0) {
     // enchainer = add one to the current pattern number, and wrap around at the end
@@ -460,7 +472,7 @@ void loop() {
   //----------------- JQ6500 ------------------//
   if (mp3.getStatus() != MP3_STATUS_PLAYING)
   {
-    mp3.playFileByIndexNumber=ledAudioPattern;//mp3.playFileByIndexNumber(gCurrentPatternNumber);
+    mp3.playFileByIndexNumber=audioPattern;//mp3.playFileByIndexNumber(gCurrentPatternNumber);
     mp3.play();
   }
 
