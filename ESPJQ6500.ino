@@ -21,7 +21,6 @@
  * int pos = beatsin16( 13, 0, NUM_LEDS-1 );
  * is setup to do 13 BPM, cycling from 0 to NUM_LEDS-1 (ie from the first pixel to the last pixel in the strip). 
  * That resulting pos number becomes the pixel position, leds[pos], when assigning color.
-
  * 3) random() : nombreuse fonction random décrites dans lib8tion.h (lien plus haut)
  * random16( n)    == random from 0..(N-1)
  * random8()       == random from 0..255
@@ -42,6 +41,7 @@
 #include <PubSubClient.h>//https://pubsubclient.knolleary.net/api.html
 #include <ESP8266WiFi.h>//https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/station-class.html
 
+/*
 //For OTA Update
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h>
@@ -49,6 +49,7 @@
 
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
+*/
 
 //LEDSTRIPS LIBS
 //4 lignes nécessaires pour éviter un flash intempestif récurrent...
@@ -97,15 +98,15 @@ PubSubClient client(ESP01client);
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
 byte holdPattern = 10; // nombre de secondes à jouer le ledAudioPattern courant
-byte modePattern = 0; //mode d'enchainement des patterns : 0 = enchainer
+byte modePattern = 1; //mode d'enchainement des ledAudioPattern : 0 = enchainer et 1 = jouer le ledAudioPattern courant (appelé via MQTT)
 
-String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX. Je ne choisi pas ce nom il est dans l'ESP de base
+String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX, il est dans l'ESP de base
 String topicName = clientID + "/#";//Topic individuel nominatif pour publier un message unique à un ESP unique
 
 uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
-bool global_enabled = false; //ne pas lancer de patterns dans le ledstrip tant que pas de messages reçu en MQTT
+bool global_enabled = false; //FLAG : ne pas lancer de ledAudioPattern tant que pas de messages reçu en MQTT
 
 //-------------FONCTION WIFI : connexion, IP -------------
 void setup_wifi() {
@@ -116,7 +117,7 @@ void setup_wifi() {
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(200);
     Serial.print(".");
   }
 
@@ -144,6 +145,7 @@ void connect_mqtt()
   client.subscribe(topicName.c_str());
 
   client.publish("welcome", clientID.c_str()); // publie son nom sur le topic welcome lors de la connexion
+  Serial.println("connexion au Broker Mosquitto OK !!");
   Serial.printf("topic welcome : %s\n", clientID.c_str());
 }
 
@@ -168,7 +170,7 @@ void p0() {
 void p1()
 {
   static int i = 0;
-  // Set the i'th led to red
+  // Set the i'th led to rotating hue, moving forward strip
   leds[i] = CHSV(hue++, 255, 255);
   CYCLE_LED(i);
 }
@@ -177,12 +179,12 @@ void p1()
 void p2()
 {
   static int i = NUM_LEDS;
-  // Set the i'th led to red
+  // Set the i'th led to rotating hue, moving backward strip 
   leds[i] = CHSV(hue++, 255, 255);
   REVERSE_CYCLE_LED(i);
 }
 
-//---------Path-drik.ino : allumage successif non maintenu en avant--------
+//--------- allumage successif non maintenu en avant--------
 //https://github.com/FastLED/FastLED/wiki/RGBSet-Reference
 void p3()
 {
@@ -376,7 +378,7 @@ void callback(char* topic, byte* payload, unsigned int length)
 //----------------------------------------SETUP--------------------------------------
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(74880);
 
   //////////// ESP01 settings //////////
   //********************* CHANGE ESP01 PIN FUNCTION **************************************
@@ -416,12 +418,13 @@ void setup() {
   Serial.println(nFunc); // ?
   Serial.println();
  */
- 
+ /*
   //OTA Update setup
   MDNS.begin(clientID);
   httpUpdater.setup(&httpServer);
   httpServer.begin();
   MDNS.addService("http", "tcp", 80);
+  */
 }
 
 //---------------------------------------- --------------------------------------
@@ -438,7 +441,7 @@ void nextPattern()
 
 void loop() {
   //OTA Update Check
-  httpServer.handleClient();
+  //httpServer.handleClient();
 
   //if not connected to Wifi tries to connect
   if (WiFi.status() != WL_CONNECTED)
