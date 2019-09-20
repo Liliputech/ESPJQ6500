@@ -1,4 +1,4 @@
-/*
+ /*
  * FastLED DOCS
  * demoReel100 getstarted https://www.reddit.com/r/FastLED/comments/b2ceka/new_to_fastled_and_trying_to_understand_examples/
  * Overview https://github.com/FastLED/FastLED/wiki/Overview 
@@ -60,7 +60,7 @@ ESP8266HTTPUpdateServer httpUpdater;
 //LEDSTRIPS SETTINGS
 #define FASTLED_USING_NAMESPACE
 #define FASTLED_SHOW_CORE 0
-#define NUM_LEDS 30 // 5 mètres de WS2813B en 60 leds/mètre
+#define NUM_LEDS 300 // 5 mètres de WS2813B en 60 leds/mètre
 #define DATA_PIN 0 // ledstrip connecté au GPIO 0 de l'ESP01
 #define BRIGHTNESS  30
 #define FRAMES_PER_SECOND  120
@@ -97,13 +97,13 @@ WiFiClient ESP01client;
 PubSubClient client(ESP01client);
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
-byte holdPattern = 10; // nombre de secondes à jouer le ledAudioPattern courant
-byte modePattern = 1; //mode d'enchainement des ledAudioPattern : 0 = enchainer et 1 = jouer le ledAudioPattern courant (appelé via MQTT)
+byte holdPattern = 1; // nombre de secondes à jouer le ledAudioPattern courant
+//byte modePattern = 1; //mode d'enchainement des ledAudioPattern : 0 = enchainer et 1 = jouer le ledAudioPattern courant (appelé via MQTT)
 
 String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX, il est dans l'ESP de base
 String topicName = clientID + "/#";//Topic individuel nominatif pour publier un message unique à un ESP unique
 
-uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
+//uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 
 bool global_enabled = false; //FLAG : ne pas lancer de ledAudioPattern tant que pas de messages reçu en MQTT
@@ -318,7 +318,7 @@ int payloadToInt(byte* payload, int length){
 void setPattern(int ledAudioPattern) {
   if ((ledAudioPattern >= 0) && (ledAudioPattern < ARRAY_SIZE(gPatterns)))
   {
-    gCurrentPatternNumber = ledAudioPattern;
+    gPatterns = ledAudioPattern;//gCurrentPatternNumber = ledAudioPattern;
   }
 }
 
@@ -428,7 +428,7 @@ void setup() {
 }
 
 //---------------------------------------- --------------------------------------
-
+/*
 void nextPattern()
 { // Si modestate = 0 ALORS enchainer les patterns SINON ne jouer que le ledAudioPattern appelé
   //exemple: mosquitto_pub -t modestate -m 0
@@ -437,7 +437,7 @@ void nextPattern()
     gCurrentPatternNumber = (gCurrentPatternNumber + 1) % ARRAY_SIZE( gPatterns);
   }
 }
-
+*/
 
 void loop() {
   //OTA Update Check
@@ -460,12 +460,12 @@ void loop() {
   //----------------- JQ6500 ------------------//
   if (mp3.getStatus() != MP3_STATUS_PLAYING)
   {
-    mp3.playFileByIndexNumber(gCurrentPatternNumber);
+    mp3.playFileByIndexNumber=ledAudioPattern;//mp3.playFileByIndexNumber(gCurrentPatternNumber);
     mp3.play();
   }
 
   // Call the current pattern function once, updating the 'leds' array
-  gPatterns[gCurrentPatternNumber]();
+  //gPatterns[gCurrentPatternNumber]();
 
   // send the 'leds' array out to the actual LED strip
   FastLED.show();
@@ -478,6 +478,6 @@ void loop() {
   }
 
   EVERY_N_SECONDS( holdPattern ) {
-    nextPattern();  // change patterns periodically
+    //nextPattern();  // change patterns periodically
   }
 }
