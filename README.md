@@ -33,3 +33,10 @@ exemple:
 -----
 
 UPLOAD VIA FTDI232 works fine however a similar chip named YP-05 gives nothing back in Arduino monitor
+
+-----
+# JQ6500_ESP01-HelloWorld.ino
+I finally realize that serial declaration syntax has changed, JQ6500 helloworld example is a bad guy
+----
+# JQ6500MQTTPLAYER.ino
+this sketch uses its own ESP01 to trig sounfiles, no FastLED
