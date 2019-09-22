@@ -51,7 +51,8 @@ PubSubClient client(ESP01client);
 
 //Variables pour recevoir le nombre de boucles et les patterns publiés par l'extérieur (Ubuntu ou Paho par ex.)
 byte ledPattern = 0; // pattern # : 255 patterns maximum
-byte holdPattern = 1; // number of loops : 255 loop maximum , 0 = perpetual loop
+float holdPattern = 0; // number of seconds a led pattern must appear : 0 = perpetual loop
+unsigned int startTime; // defines the time when a new pattern is received (needed to know when this pattern must finish)
 bool blocLoop = false; //avoid infinite loop()
 
 String clientID = WiFi.hostname();//nom DHCP de l'ESP, quelque chose comme : ESP_XXXXX, il est dans l'ESP de base
@@ -290,6 +291,14 @@ int payloadToInt(byte* payload, int length){
   return payloadFromMQTT.toInt();//convertir le String en entier et retourner la valeur
 }
 
+float payloadToFloat(byte* payload, int length){
+  String payloadFromMQTT = "";
+  for (int i = 0; i < length; i++) { //itérer dans toute la longueur message, length est fourni dans le callback MQTT
+    if (isDigit(payload[i]))// tester si le payload est bien un chiffre décimal
+      payloadFromMQTT += (char)payload[i];//caster en type char et ajouter/placer dans la variable
+  }
+  return payloadFromMQTT.toFloat();//convertir le String en Float et retourner la valeur
+}
 
 //-------------FONCTION CALLBACK------------
 //l'étoile * means a pointer to the given type. Explained in chapter 1 of any C book
@@ -309,7 +318,7 @@ void callback(char* topic, byte* payload, unsigned int length)
   //exemple de publication pour un pattern d'une durée de 10 secondes : mosquitto_pub -t holdPattern -m 10
   if ( (strcmp(topic, (clientID + "/holdPattern").c_str()) == 0) //pour ce client uniquement
        || (strcmp(topic, "holdPattern") == 0)) { //pour tous les clients
-    holdPattern = payloadToInt(payload,length);
+    holdPattern = payloadToFloat(payload,length);
     debugMessage += holdPattern;
   }
 
@@ -321,7 +330,8 @@ void callback(char* topic, byte* payload, unsigned int length)
  if ( (strcmp(topic, (clientID + "/ledstate").c_str()) == 0) //mosquitto_pub -t ESP_304B27/ledstate -m 1
        || (strcmp(topic, "ledstate") == 0)) { // pour tous les clients: mosquitto_pub -t ledstate -m 1
     ledPattern = payloadToInt(payload,length);
-   // setPattern(ledPattern);
+    startTime = millis();
+    FastLED.setBrightness(BRIGHTNESS);// (255) = puissance maximale -----> ATTENTION POWER !
     debugMessage += ledPattern;
     blocLoop = true;//orienter le processeur vers le nb de boucles à effectuer
   }
@@ -424,38 +434,26 @@ void loop() {
     return;
 
 
-  //BOUCLAGE INFINI
-  if (holdPattern == 0) { //si la variable holdPattern est 0 on boucle perpétuellement setPattern()
-    setPattern();//on appelle effectivement la fonction correspondante au message MQTT
-
-    Serial.print(">");
-    Serial.print(ledPattern);//on imprime le n° de ledPattern à chaque fois qu'on le rejoue
-    Serial.println("<");
+  //Si holdPattern plus petit que zero on sort du if
+  if ((int)holdPattern > 0 &&
+      //Si on arrive au bout de holdPattern on entre dans le if et on décroit progressivement la luminosité
+      (millis() >= startTime + (int) holdPattern*1000)) {
+    FastLED.setBrightness(FastLED.getBrightness()-10);
+    Serial.print("brightness reduced by 10");
   }
 
+  setPattern();//on appelle effectivement la fonction correspondante au message MQTT
+  Serial.print(">");
+  Serial.print(ledPattern);//on imprime le n° de ledPattern à chaque fois qu'on le rejoue
+  Serial.println("<");
+  // p0();//on fait un fondu général pour ne rien laisser allumer ("fadeall, done!")
 
-  //BOUCLAGE "holdPattern" FOIS
-  else  { //patterns qui doivent se reproduire en nombre de bouclages définis par la variable holdPattern
-    if (blocLoop == true) { // open flag : cette condition permet d'éviter que le pattern ci-dessous ne continue indéfiniement dans loop()
-      for (int i = 0; i < holdPattern ; i++); { //on va répéter la fonction setPattern() "holdPattern" fois
-        setPattern();//on appelle effectivement la fonction correspondante au message MQTT
+  //cette ligne afin d'éviter que le dernier pattern en mémoire ne démarre automatiquement si on fait une publication du type:
+  //mosquitto_pub -t holdPattern -m 0 // càd une demande de bouclage infinie juste avant de lancer un nouveau pattern
+  //ledPattern = 0;
 
-        Serial.print(">");
-        Serial.print(ledPattern);//on imprime le n° de ledPattern à chaque fois qu'on le rejoue
-        Serial.println("<");
-      }
-     // p0();//on fait un fondu général pour ne rien laisser allumer ("fadeall, done!")
-
-      //cette ligne afin d'éviter que le dernier pattern en mémoire ne démarre automatiquement si on fait une publication du type:
-      //mosquitto_pub -t holdPattern -m 0 // càd une demande de bouclage infinie juste avant de lancer un nouveau pattern
-      //ledPattern = 0;
-
-      blocLoop = false;//close flag : la boucle ne continue pas plus que "holdPattern" fois
-      Serial.println("fadeall done!");
-
-
-      /*TO DO
-//https://github.com/marmilicious/FastLED_examples/blob/master/every_n_timers.ino
+  /*TO DO
+  //https://github.com/marmilicious/FastLED_examples/blob/master/every_n_timers.ino
   // send the 'leds' array out to the actual LED strip
   FastLED.show();
   // insert a delay to keep the framerate modest
@@ -469,6 +467,4 @@ void loop() {
   EVERY_N_SECONDS( holdPattern ) {
     nextPattern();  // change patterns periodically
     */
-    }
-  }
 }
